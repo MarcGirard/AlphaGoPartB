@@ -46,6 +46,7 @@ class PlayerWrapper:
         self.log(self.timer.status(), depth=1)
         self.log(self.space.status(), depth=1)
 
+
     def action(self):
         self.log(f"asking {self.name} for next action...")
         with self.space, self.timer:

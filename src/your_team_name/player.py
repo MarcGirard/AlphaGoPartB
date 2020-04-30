@@ -1,4 +1,9 @@
 
+from collections import Counter
+
+
+
+
 class ExamplePlayer:
     def __init__(self, colour):
         """
@@ -12,6 +17,20 @@ class ExamplePlayer:
         strings "white" or "black" correspondingly.
         """
         # TODO: Set up state representation.
+
+        board = {(x, y):0 for x in range(8) for y in range(8)}
+
+        black_tokens = [(0,7), (1,7),   (3,7), (4,7),   (6,7), (7,7),
+                        (0,6), (1,6),   (3,6), (4,6),   (6,6), (7,6)]
+        white_tokens = [(0,1), (1,1),   (3,1), (4,1),   (6,1), (7,1),
+                        (0,0), (1,0),   (3,0), (4,0),   (6,0), (7,0)]
+
+        for xy in white_tokens:
+            board[xy] = +1
+        for xy in black_tokens:
+            board[xy] = -1
+
+        print(board)
 
 
     def action(self):

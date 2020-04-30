@@ -69,6 +69,7 @@ def play(players,
     # Player classes including running their .__init__() methods).
     game = Game(logfilename=logfilename, debugboard=use_debugboard,
                 colourboard=use_colour, unicodeboard=use_unicode)
+
     out("initialising players", depth=-1)
     for player, colour in zip(players, COLOURS):
         # NOTE: `player` here is actually a player wrapper. Your program should
@@ -78,6 +79,7 @@ def play(players,
     # Display the initial state of the game.
     out("game start!", depth=-1)
     display_state(game)
+
 
     # Repeat the following until the game ends
     # (starting with White as the current player, then alternating):
@@ -147,6 +149,8 @@ class Game:
             self.board[xy] = +1
         for xy in _BLACK_START_SQUARES:
             self.board[xy] = -1
+
+        print(self.board)
         # also keep track of some other state variables for win/draw
         # detection (score, number of turns, state history)
         self.score = {'white': 12, 'black': 12}
