@@ -1,6 +1,7 @@
 
 from collections import Counter
 import copy
+import time
 
 
 
@@ -23,7 +24,10 @@ class ExamplePlayer:
             self.opponentColour = "black"
         else:
             self.opponentColour = "white"
-
+        
+        self.movesRemaining = 250
+        self.timeRemaining = 60
+        
         self.board = {(x, y):0 for x in range(8) for y in range(8)}
 
         white_tokens = [(0,1), (1,1),   (3,1), (4,1),   (6,1), (7,1),
@@ -50,7 +54,7 @@ class ExamplePlayer:
         """
         # TODO: Decide what action to take, and return it
 
-
+        startTimer = time.time()
         if self.isAnyMovePossible() == True:
             moves = self.getAllPossibleMoves(self.board, self.colour)
 
@@ -58,6 +62,21 @@ class ExamplePlayer:
         best = None
         alpha = None
         beta = float("inf")
+        
+#Changing the number of ply for minimax tree to budget time and get best possible moves         
+     # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
+        if time < 3:
+            depth = 1
+        elif time < 10:
+            depth = 2
+        elif time < 30:
+            depth = 4
+        else:
+            if self.movesRemaining > 65:
+                depth = 8
+            else:
+                depth = 6
+# 
         for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
             newBoard = copy.deepcopy(self.board)
             self.doMove(newBoard,move)
@@ -68,7 +87,11 @@ class ExamplePlayer:
                 best = moveVal
             if alpha == None or best > alpha:
                 alpha = best
-
+                
+        stopTimer =  time.time()
+        self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
+        self.movesRemaining = self.movesRemaining - 1
+       
         return bestMove
 
 
@@ -91,6 +114,9 @@ class ExamplePlayer:
         against the game rules).
         """
         # TODO: Update state representation in response to action.
+        
+        if action == "Boom":
+        
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self):
