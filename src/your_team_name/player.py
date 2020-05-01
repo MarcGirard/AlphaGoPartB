@@ -115,9 +115,22 @@ class ExamplePlayer:
         """
         # TODO: Update state representation in response to action.
         
-        if action == "Boom":
-        
-
+        if action[0] == "Boom":
+            self.board[action[1]] = 0
+           # Recursive booms
+            for i in range(action[1][0]-1,action[1][0]+2):
+                    for j in range(action[1][1]-1,action[1][1]+2):
+                        self.board[(i,j)] = 0
+            
+        else:
+            if self.colour = colour:
+                self.board[action[2]] -= action[2]
+                self.board[action[3]] += action[2]
+            else:
+                self.board[action[2]] += action[2]
+                self.board[action[3]] -= action[2]
+            
+            
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self):
         # Loop through all board positions
@@ -169,12 +182,12 @@ class ExamplePlayer:
             if nb_token > 0 and self.colour == "white":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
-                        if self.board[(x,y)] < 0:
+                        if self.board[(i,j)] < 0:
                             return True
             elif nb_token < 0 and self.colour == "black":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
-                        if self.board[(x,y)] > 0:
+                        if self.board[(i,j)] > 0:
                             return True  
         return False
 
@@ -209,13 +222,13 @@ class ExamplePlayer:
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
                         # if there is a close enemy
-                        if board[(x,y)] < 0:
+                        if board[(i,j)] < 0:
                             moves.append(("BOOM", (x, y)))
             elif nb_token < 0 and colour == "black":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
                         # if there is a close enemy
-                        if board[(x,y)] > 0:
+                        if board[(i,j)] > 0:
                             moves.append(("BOOM", (x, y)))  
         return moves
 
@@ -236,6 +249,7 @@ class ExamplePlayer:
             print("it is a BOOM action")
             # current pos
             board[move[2]] = 0
+            
 
     def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
         if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
