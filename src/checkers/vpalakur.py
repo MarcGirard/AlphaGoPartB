@@ -15,7 +15,7 @@ def evaluation(board, color, depth, turn, opponentColor, alpha, beta):
                 nextBoard = deepcopy(board)
                 gamePlay.doMove(nextBoard,move)
                 if beta > opti:
-                    value = evaluation(nextBoard, color, depth, '9', opponentColor, alpha, beta)
+                    value = evaluation(nextBoard, color, depth, 'min', opponentColor, alpha, beta)
                     if value > opti: #None is less than everything and anything so we don't need opti == None check
                         opti = value
                     if opti > alpha:
@@ -60,12 +60,14 @@ def evaluation(board, color, depth, turn, opponentColor, alpha, beta):
 
 def nextMove(board, color, time, movesRemaining):
     moves = getAllPossibleMoves(board, color)
+
     opponentColor = gamePlay.getOpponentColor(color)
     depth = 5
     best = None
     alpha = None
     beta = float("inf")
     for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
+        
         newBoard = deepcopy(board)
         gamePlay.doMove(newBoard,move)
         #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.

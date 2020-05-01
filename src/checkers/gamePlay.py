@@ -38,7 +38,7 @@ def isCapturePossible(board, color):
 		x = xy[0]
 		y = xy[1]
 		
-		# Check whether this board position is our color
+		# Check whdoModoMoether this board position is our color
 		if board[x][y].upper() == color.upper():
 			if isCapturePossibleFromPosition(board, x, y) == True:
 				return True
@@ -240,7 +240,7 @@ def newBoard():
 		x = xy[0]
 		y = xy[1]
 		board[x][y] = 'w'
-	
+
 	return board
 
 def printBoard(board):
@@ -335,8 +335,6 @@ if __name__ == "__main__":
 			verbose = True
 		if (op == "-t"):
 			clockTime = float(opVal)
-
-	print(args)
 
 	exec("from " + args[0] + " import nextMove")
 	p1 = nextMove

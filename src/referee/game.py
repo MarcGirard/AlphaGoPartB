@@ -150,7 +150,6 @@ class Game:
         for xy in _BLACK_START_SQUARES:
             self.board[xy] = -1
 
-        print(self.board)
         # also keep track of some other state variables for win/draw
         # detection (score, number of turns, state history)
         self.score = {'white': 12, 'black': 12}
