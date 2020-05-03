@@ -54,7 +54,7 @@ class ExamplePlayer:
         # TODO: Decide what action to take, and return it
 
         startTimer = time.time()
-        print("time remaining", self.timeRemaining)
+        # print("time remaining", self.timeRemaining)
         depth = 3
         if self.isAnyMovePossible() == True:
             moves = self.getAllPossibleMoves(self.board, self.colour)
@@ -66,7 +66,7 @@ class ExamplePlayer:
         elif self.timeRemaining < 10:
             depth = 2
         elif self.timeRemaining < 30:
-            depth = 4
+            depth = 3
         else:
             if self.movesRemaining > 65:
                 depth = 4
@@ -88,6 +88,7 @@ class ExamplePlayer:
                 best = moveVal
             if alpha == None or best > alpha:
                 alpha = best
+            # input("Press the <ENTER> key to continue...")
 
         stopTimer =  time.time()
         self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
@@ -241,20 +242,23 @@ class ExamplePlayer:
     def doMove(self, board, move):
         # Will perform the move
         if move[0] == "MOVE":
-            if self.colour == "white":
-                # next pos
-                board[move[3]] += move[1]
+            nb_token_moved = move[1]
+            start_position = move[2]
+            end_position = move[3]
+            if board[start_position] > 0:
                 # current pos
-                board[move[2]] -= move[1]
+                board[start_position] -= nb_token_moved
+                # next pos
+                board[end_position] += nb_token_moved
             else:
-                # next pos
-                board[move[3]] -= move[1]
                 # current pos
-                board[move[2]] += move[1]
+                board[start_position] += nb_token_moved
+                # next pos
+                board[end_position] -= nb_token_moved
         else:
             print("it is a BOOM action")
             # current pos
-            board[move[2]] = 0
+            board[move[1]] = 0
 
     def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
         if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
@@ -287,6 +291,8 @@ class ExamplePlayer:
 
         else: #Comes here for the last level i.e leaf nodes
             value = 0
+            # self.print_board_prototype(board)
+            # input("Press the <ENTER> key to continue...")
             for position, nb_token in board.items():
                 x, y = position
                 #Below, we count the number of token in a stack for each colour.
@@ -303,3 +309,32 @@ class ExamplePlayer:
                 elif board[position] < -1:
                     value -= 3
             return value
+
+    def print_board_prototype(self, board):
+        # print(board)
+        new_board = []
+        i=0
+        j=8
+        new_board = list(board.values())
+        inter = list()
+        for _ in range(8):
+            inter.append(new_board[i:j])
+            i = j
+            j = j+8
+
+        new_board = []
+        for i in range(0,8):
+            new_board.append([inter[j][7-i] for j in range(0,8)])
+
+        stri = '-'*50
+        for j in new_board:
+            stri+='\n'
+            for item in j:
+                stri += '|\t'+ str(item)+'\t'
+            stri += '\n'
+            stri += '-'*50
+
+        print(stri.expandtabs(3))
+
+            
+
