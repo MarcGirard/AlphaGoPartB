@@ -1,7 +1,7 @@
 
 from collections import Counter
 import copy
-
+import time
 
 
 class ExamplePlayer:
@@ -23,6 +23,9 @@ class ExamplePlayer:
             self.opponentColour = "black"
         else:
             self.opponentColour = "white"
+
+        self.movesRemaining = 250
+        self.timeRemaining = 60
 
         self.board = {(x, y):0 for x in range(8) for y in range(8)}
 
@@ -50,11 +53,27 @@ class ExamplePlayer:
         """
         # TODO: Decide what action to take, and return it
 
-
+        startTimer = time.time()
+        print("time remaining", self.timeRemaining)
+        depth = 3
         if self.isAnyMovePossible() == True:
             moves = self.getAllPossibleMoves(self.board, self.colour)
 
-        depth = 3
+        #Changing the number of ply for minimax tree to budget time and get best possible moves         
+        # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
+        if self.timeRemaining < 3:
+            depth = 1
+        elif self.timeRemaining < 10:
+            depth = 2
+        elif self.timeRemaining < 30:
+            depth = 4
+        else:
+            if self.movesRemaining > 65:
+                depth = 4
+            else:
+                depth = 3
+
+        
         best = None
         alpha = None
         beta = float("inf")
@@ -63,11 +82,16 @@ class ExamplePlayer:
             self.doMove(newBoard,move)
             #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
             moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
+            # print("move val", moveVal, best)
             if best == None or moveVal > best:
                 bestMove = move
                 best = moveVal
             if alpha == None or best > alpha:
                 alpha = best
+
+        stopTimer =  time.time()
+        self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
+        self.movesRemaining = self.movesRemaining - 1
 
         return bestMove
 
@@ -91,6 +115,27 @@ class ExamplePlayer:
         against the game rules).
         """
         # TODO: Update state representation in response to action.
+
+        if action[0] == "BOOM":
+            position = action[1]
+            x, y = position
+            self.board[position] = 0
+            # Recursive booms
+            for i in range(x-1,x+2):
+                for j in range(y-1,y+2):
+                    self.board[(i,j)] = 0
+        else:
+            nb_token_moved = action[1]
+            start_position = action[2]
+            end_position = action[3]
+            if self.board[start_position] > 0:
+                self.board[start_position] -= nb_token_moved
+                self.board[end_position] += nb_token_moved
+            elif self.board[start_position] < 0:
+                self.board[start_position] += nb_token_moved
+                self.board[end_position] -= nb_token_moved
+            else:
+                print("Action ERROR")
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self):
@@ -238,7 +283,6 @@ class ExamplePlayer:
                             opti = value
                         if opti < beta:
                             beta = opti
-
             return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
 
         else: #Comes here for the last level i.e leaf nodes

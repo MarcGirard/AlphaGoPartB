@@ -100,6 +100,7 @@ def play(players,
         # Notify both players (including the current player) of the action
         # (using their .update() methods).
         for player in players:
+            print("current player", curr_player.colour)
             player.update(curr_player.colour, action)
 
         # Next player's turn!
