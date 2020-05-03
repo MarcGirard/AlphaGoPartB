@@ -2,7 +2,7 @@
 from collections import Counter
 import copy
 import time
-
+import random
 
 
 class ExamplePlayer:
@@ -54,51 +54,20 @@ class ExamplePlayer:
         """
         # TODO: Decide what action to take, and return it
 
-        startTimer = time.time()
+        '''Just play randomly among the possible moves'''
+        moves = []
         if self.isAnyMovePossible() == True:
             moves = self.getAllPossibleMoves(self.board, self.colour)
-
-        depth = 3
-        best = None
-        alpha = None
-        beta = float("inf")
-        
-    #Changing the number of ply for minimax tree to budget time and get best possible moves         
-        if self.timeRemaining < 4:
-            depth = 1
-        elif self.timeRemaining < 10:
-            depth = 2
-        elif self.timeRemaining < 30:
-            depth = 4
-        else:
-            if self.movesRemaining > 65:
-                depth = 8
-            else:
-                depth = 6
-# 
-        for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
-            newBoard = copy.deepcopy(self.board)
-            self.doMove(newBoard,move)
-            #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
-            moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-            if best == None or moveVal > best:
-                bestMove = move
-                best = moveVal
-            if alpha == None or best > alpha:
-                alpha = best
-                
-        stopTimer =  time.time()
-        self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
-        self.movesRemaining = self.movesRemaining - 1
-       
-        return bestMove
     
+        bestMove = moves[random.randint(0,len(moves) - 1)]
+        return bestMove       
+        
     def NEAR_SQUARES(self, square):
         # Code borrowed from the refree function
         x, y = square
         return {(x-1,y+1),(x,y+1),(x+1,y+1),
                 (x-1,y),          (x+1,y),
-                (x-1,y-1),(x,y-1),(x+1,y-1)} & self.board
+                (x-1,y-1),(x,y-1),(x+1,y-1)} & set(self.board.keys())
 
 
     def update(self, colour, action):
@@ -121,7 +90,7 @@ class ExamplePlayer:
         """
         # TODO: Update state representation in response to action.
         
-        if action[0] == "Boom":
+        if action[0] == "BOOM":
            # Recursive booms
             booms = [action[1]]
             for boom_square in booms:
@@ -131,14 +100,13 @@ class ExamplePlayer:
                         booms.append(near_square)
             
         else:
-            if self.colour == colour:
-                self.board[action[2]] -= action[2]
-                self.board[action[3]] += action[2]
+            if colour == "white":
+                self.board[action[2]] -= action[1]
+                self.board[action[3]] += action[1]
             else:
-                self.board[action[2]] += action[2]
-                self.board[action[3]] -= action[2]
+                self.board[action[2]] += action[1]
+                self.board[action[3]] -= action[1]
 
-                
             
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self):
@@ -226,19 +194,28 @@ class ExamplePlayer:
                     if self.canMoveToPosition(x, y, x, y+i) == True:                                
                         moves.append(("MOVE", i, (x, y), (x, y+i)))
                 
-            # BOOM action
+            # # BOOM action
+            # if nb_token > 0 and colour == "white":
+            #     for i in range(x-1,x+2):
+            #         for j in range(y-1,y+2):
+            #             # if there is a close enemy
+            #             if i>=0 and i<=7 and j>=0 and j<=7:
+            #                 if board[(i,j)] < 0:
+            #                     moves.append(("BOOM", (x, y)))
+            # elif nb_token < 0 and colour == "black":
+            #     for i in range(x-1,x+2):
+            #         for j in range(y-1,y+2):
+            #             # if there is a close enemy
+            #             if i>=0 and i<=7 and j>=0 and j<=7:
+            #                 if board[(i,j)] > 0:
+            #                     moves.append(("BOOM", (x, y)))
+
+            # # BOOM action
             if nb_token > 0 and colour == "white":
-                for i in range(x-1,x+2):
-                    for j in range(y-1,y+2):
-                        # if there is a close enemy
-                        if board[(i,j)] < 0:
-                            moves.append(("BOOM", (x, y)))
+                moves.append(("BOOM", (x, y)))
             elif nb_token < 0 and colour == "black":
-                for i in range(x-1,x+2):
-                    for j in range(y-1,y+2):
-                        # if there is a close enemy
-                        if board[(i,j)] > 0:
-                            moves.append(("BOOM", (x, y)))  
+                moves.append(("BOOM", (x, y)))
+
         return moves
 
     def doMove(self, board, move):
@@ -257,9 +234,9 @@ class ExamplePlayer:
         else:
             print("it is a BOOM action")
             # current pos
-            board[move[2]] = 0
+            board[move[1]] = 0
             # Recursive booms
-            booms = [move[2]]
+            booms = [move[1]]
             for boom_square in booms:
                 board[boom_square] = 0
                 for near_square in self.NEAR_SQUARES(boom_square):
@@ -267,50 +244,4 @@ class ExamplePlayer:
                         booms.append(near_square)
             
 
-    def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
-        if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
-            depth -= 1
-            opti = None
-            if turn == 'max':
-                moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
-                for move in moves:
-                    nextBoard = copy.deepcopy(board)
-                    self.doMove(nextBoard,move)
-                    if opti == None or beta > opti:
-                        value = self.alphaBeta_pruning(nextBoard, colour, depth, 'min', opponentColour, alpha, beta)
-                        if opti == None or value > opti:
-                            opti = value
-                        if alpha == None or opti > alpha:
-                            alpha = opti
-
-            elif turn == 'min':
-                moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
-                for move in moves:
-                    nextBoard = copy.deepcopy(board)
-                    self.doMove(nextBoard,move)
-                    if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
-                        value = self.alphaBeta_pruning(nextBoard, colour, depth, 'max', opponentColour, alpha, beta)
-                        if opti == None or value < opti: #opti = None for the first time
-                            opti = value
-                        if opti < beta:
-                            beta = opti
-
-            return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
-
-        else: #Comes here for the last level i.e leaf nodes
-            value = 0
-            for position, nb_token in board.items():
-                #Below, we count the number of token in a stack for each colour.
-                #A player stack of more than 1 token is 1.5 times more valuable than a stack of 1 token.
-                #An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
-                #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
-                #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                if board[position] == 1:
-                    value += 2
-                elif board[position] == -1:
-                    value -= 2
-                elif board[position] > 1:
-                    value += nb_token
-                elif board[position] < -1:
-                    value -= nb_token
-            return value
+    
