@@ -59,36 +59,39 @@ class ExamplePlayer:
         if self.isAnyMovePossible() == True:
             moves = self.getAllPossibleMoves(self.board, self.colour)
 
-        #Changing the number of ply for minimax tree to budget time and get best possible moves         
-        # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
-        if self.timeRemaining < 3:
-            depth = 1
-        elif self.timeRemaining < 10:
-            depth = 2
-        elif self.timeRemaining < 30:
-            depth = 3
-        else:
-            if self.movesRemaining > 65:
-                depth = 4
-            else:
+            #Changing the number of ply for minimax tree to budget time and get best possible moves         
+            # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
+            if self.timeRemaining < 3:
+                depth = 1
+            elif self.timeRemaining < 10:
+                depth = 2
+            elif self.timeRemaining < 30:
                 depth = 3
+            else:
+                if self.movesRemaining > 65:
+                    depth = 4
+                else:
+                    depth = 3
 
-        
-        best = None
-        alpha = None
-        beta = float("inf")
-        for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
-            newBoard = copy.deepcopy(self.board)
-            self.doMove(newBoard,move)
-            #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
-            moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-            # print("move val", moveVal, best)
-            if best == None or moveVal > best:
-                bestMove = move
-                best = moveVal
-            if alpha == None or best > alpha:
-                alpha = best
-            # input("Press the <ENTER> key to continue...")
+            
+            best = None
+            alpha = None
+            beta = float("inf")
+            for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
+                newBoard = copy.deepcopy(self.board)
+                self.doMove(newBoard,move)
+                #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
+                moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
+                # print("move val", moveVal, best)
+                if best == None or moveVal > best:
+                    bestMove = move
+                    best = moveVal
+                if alpha == None or best > alpha:
+                    alpha = best
+                # input("Press the <ENTER> key to continue...")
+        else:
+            print("No Possible move!")
+            bestMove = None
 
         stopTimer =  time.time()
         self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
@@ -122,9 +125,7 @@ class ExamplePlayer:
             x, y = position
             self.board[position] = 0
             # Recursive booms
-            for i in range(x-1,x+2):
-                for j in range(y-1,y+2):
-                    self.board[(i,j)] = 0
+            self.checkCollateralBOOM(board, x, y)
         else:
             nb_token_moved = action[1]
             start_position = action[2]
@@ -172,8 +173,8 @@ class ExamplePlayer:
         # check if positions are inside the board
         if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or x1 > 7 or y1 > 7 or x2 > 7 or y2 > 7:
             return False
-        #check (x2,y2) position if non-empty
-        if self.board[(x2,y2)] != 0:
+        #check (x2,y2) position if there is enemy token(s)
+        if (self.colour == "white" and self.board[(x2,y2)] < 0) or (self.colour == "black" and self.board[(x2,y2)] > 0):
             return False
 
         return True
@@ -189,12 +190,12 @@ class ExamplePlayer:
             if nb_token > 0 and self.colour == "white":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
-                        if self.board[(x,y)] < 0:
+                        if self.board[(i,j)] < 0:
                             return True
             elif nb_token < 0 and self.colour == "black":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
-                        if self.board[(x,y)] > 0:
+                        if self.board[(i,j)] > 0:
                             return True  
         return False
 
@@ -228,17 +229,18 @@ class ExamplePlayer:
             if nb_token > 0 and colour == "white":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
-                        # if there is a close enemy
-                        if board[(x,y)] < 0:
-                            moves.append(("BOOM", (x, y)))
+                        if x > 0 and y > 0 and x < 7 and y < 7: # if (i,j) is inside the board
+                            if board[(i,j)] < 0: # if there is an enemy token
+                                moves.append(("BOOM", (x, y)))
             elif nb_token < 0 and colour == "black":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
-                        # if there is a close enemy
-                        if board[(x,y)] > 0:
-                            moves.append(("BOOM", (x, y)))  
+                        if x > 0 and y > 0 and x < 7 and y < 7: # if (i,j) is inside the board
+                            if board[(i,j)] > 0: # if there is an enemy token
+                                moves.append(("BOOM", (x, y)))  
         return moves
 
+    # perform the move and "updates" the board
     def doMove(self, board, move):
         # Will perform the move
         if move[0] == "MOVE":
@@ -255,11 +257,23 @@ class ExamplePlayer:
                 board[start_position] += nb_token_moved
                 # next pos
                 board[end_position] -= nb_token_moved
-        else:
-            print("it is a BOOM action")
+        else: # if move[0] == "BOOM"
             # current pos
             board[move[1]] = 0
+            x, y = move[1]
+            self.checkCollateralBOOM(board, x, y)
 
+    # checks if there is a recursive explosion of token
+    def checkCollateralBOOM(self, board, x, y):
+        for i in range(x-1,x+2):
+            for j in range(y-1,y+2):
+                if x > 0 and y > 0 and x < 7 and y < 7: # if (i,j) is inside the board
+                    if board[(i,j)] != 0: # if there is a token on position (i,j)
+                        board[(i,j)] = 0
+                        self.checkCollateralBOOM(board, i, j)
+
+
+    # Alpha Beta pruning algorithm
     def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
         if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
             depth -= 1
@@ -271,6 +285,7 @@ class ExamplePlayer:
                     self.doMove(nextBoard,move)
                     if opti == None or beta > opti:
                         value = self.alphaBeta_pruning(nextBoard, colour, depth, 'min', opponentColour, alpha, beta)
+                        value = abs(value)
                         if opti == None or value > opti:
                             opti = value
                         if alpha == None or opti > alpha:
@@ -283,9 +298,10 @@ class ExamplePlayer:
                     self.doMove(nextBoard,move)
                     if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
                         value = self.alphaBeta_pruning(nextBoard, colour, depth, 'max', opponentColour, alpha, beta)
+                        value = abs(value)
                         if opti == None or value < opti: #opti = None for the first time
                             opti = value
-                        if opti < beta:
+                        if beta == None or opti < beta:
                             beta = opti
             return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
 
@@ -300,16 +316,46 @@ class ExamplePlayer:
                 #An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
                 #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
                 #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                if board[position] == 1:
-                    value += 2
-                elif board[position] == -1:
-                    value -= 2
-                elif board[position] > 1:
-                    value += 3
-                elif board[position] < -1:
-                    value -= 3
+                if self.colour == "white"  and turn == "max": # means that we calculate (Beta) value for opponent == "black"
+                    if board[position] == 1:
+                        value -= 2
+                    elif board[position] <= -1:
+                        value += 2
+                    elif board[position] > 1:
+                        value -= 3
+                    # elif board[position] < -1:
+                    #     value += 3
+                elif self.colour == "black" and turn == "max": # means that we calculate (Beta) value for opponent == "white"
+                    if board[position] >= 1:
+                        value += 2
+                    elif board[position] == -1:
+                        value -= 2
+                    # elif board[position] > 1:
+                    #     value += 3
+                    elif board[position] < -1:
+                        value -= 3
+                elif self.colour == "white" and turn == "min": # means that we calculate (Alpha) value for us if we are the "white" player
+                    if board[position] >= 1:
+                        value += 2
+                    elif board[position] == -1:
+                        value -= 2
+                    # elif board[position] > 1:
+                    #     value += 3
+                    elif board[position] < -1:
+                        value -= 3
+                elif self.colour == "white" and turn == "min": # means that we calculate (Alpha) value for us if we are the "black" player
+                    if board[position] == 1:
+                        value -= 2
+                    elif board[position] <= -1:
+                        value += 2
+                    elif board[position] > 1:
+                        value -= 3
+                    # elif board[position] < -1:
+                    #     value += 3
+
             return value
 
+    # display board
     def print_board_prototype(self, board):
         # print(board)
         new_board = []
