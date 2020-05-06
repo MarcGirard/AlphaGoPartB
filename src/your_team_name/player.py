@@ -2,7 +2,7 @@
 from collections import Counter
 import copy
 import time
-
+import math
 
 class ExamplePlayer:
     def __init__(self, colour):
@@ -39,9 +39,6 @@ class ExamplePlayer:
         for xy in black_tokens:
             self.board[xy] = -1
 
-        # print(self.board)
-
-
     def action(self):
         """
         This method is called at the beginning of each of your turns to request 
@@ -56,9 +53,9 @@ class ExamplePlayer:
         startTimer = time.time()
         # print("time remaining", self.timeRemaining)
         depth = 3
+        bestMove = None
         if self.isAnyMovePossible() == True:
             moves = self.getAllPossibleMoves(self.board, self.colour)
-
             #Changing the number of ply for minimax tree to budget time and get best possible moves         
             # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
             if self.timeRemaining < 3:
@@ -82,16 +79,14 @@ class ExamplePlayer:
                 self.doMove(newBoard,move)
                 #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
                 moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-                # print("move val", moveVal, best)
+                # moveVal = abs(moveVal)
                 if best == None or moveVal > best:
                     bestMove = move
                     best = moveVal
                 if alpha == None or best > alpha:
                     alpha = best
-                # input("Press the <ENTER> key to continue...")
         else:
             print("No Possible move!")
-            bestMove = None
 
         stopTimer =  time.time()
         self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
@@ -125,7 +120,7 @@ class ExamplePlayer:
             x, y = position
             self.board[position] = 0
             # Recursive booms
-            self.checkCollateralBOOM(board, x, y)
+            self.checkCollateralBOOM(self.board, x, y)
         else:
             nb_token_moved = action[1]
             start_position = action[2]
@@ -179,6 +174,36 @@ class ExamplePlayer:
 
         return True
 
+    # check distance between the current token and each enemy position
+    def checkDistance(self, board, colour, xa, ya, xb, yb):
+        best_dist = 1000
+        i=0
+        save_best_pos = 1000
+        # compute euclidean distance between :
+        #   - initial position and each enemy token
+        #   - final position and each enemy token
+        for position, nb_token in board.items():
+            # if white player
+            if colour == "white" and nb_token < 0:
+                dist_initial_state = math.sqrt( (xa-position[0])**2 + (ya-position[1])**2 )
+                dist_final_state = math.sqrt( (xb-position[0])**2 + (yb-position[1])**2 )
+                if dist_initial_state < save_best_pos:
+                    save_best_pos = dist_initial_state
+                if dist_initial_state < best_dist and dist_final_state < dist_initial_state and dist_final_state < save_best_pos:
+                    best_dist = dist_initial_state
+            # if black player
+            elif colour == "black" and nb_token > 0:
+                dist_initial_state = math.sqrt( (xa-position[0])**2 + (ya-position[1])**2 )
+                dist_final_state = math.sqrt( (xb-position[0])**2 + (yb-position[1])**2 )
+                if dist_final_state < dist_initial_state:
+                    if best_dist == None or dist_final_state < best_dist:
+                        best_dist = dist_final_state
+        
+        if best_dist == 1000:
+            return False
+
+        return True
+
 
     # Returns whether any of the <colour> pieces can make a Boom
     def isBoomPossible(self):
@@ -213,17 +238,21 @@ class ExamplePlayer:
                 n = abs(nb_token)
                 for i in range(1,n+1):
                     # Can move left
-                    if self.canMoveToPosition(x, y, x-i, y) == True:                           
-                        moves.append(("MOVE", i, (x, y), (x-i, y)))
+                    if self.canMoveToPosition(x, y, x-i, y) == True:
+                        if self.checkDistance(board, colour, x, y, x-i, y) == True: 
+                            moves.append(("MOVE", i, (x, y), (x-i, y)))
                     # Can move right
-                    if self.canMoveToPosition(x, y, x+i, y) == True:                                
-                        moves.append(("MOVE", i, (x, y), (x+i, y)))
+                    if self.canMoveToPosition(x, y, x+i, y) == True:  
+                        if self.checkDistance(board, colour, x, y, x+i, y) == True:   
+                            moves.append(("MOVE", i, (x, y), (x+i, y)))
                     # Can move down
                     if self.canMoveToPosition(x, y, x, y-i) == True:                                
-                        moves.append(("MOVE", i, (x, y), (x, y-i)))
+                        if self.checkDistance(board, colour, x, y, x, y-i) == True:  
+                            moves.append(("MOVE", i, (x, y), (x, y-i)))
                     # Can move up    
                     if self.canMoveToPosition(x, y, x, y+i) == True:                                
-                        moves.append(("MOVE", i, (x, y), (x, y+i)))
+                        if self.checkDistance(board, colour, x, y, x, y+i) == True:  
+                            moves.append(("MOVE", i, (x, y), (x, y+i)))
                 
             # BOOM action
             if nb_token > 0 and colour == "white":
@@ -285,11 +314,12 @@ class ExamplePlayer:
                     self.doMove(nextBoard,move)
                     if opti == None or beta > opti:
                         value = self.alphaBeta_pruning(nextBoard, colour, depth, 'min', opponentColour, alpha, beta)
-                        value = abs(value)
-                        if opti == None or value > opti:
-                            opti = value
-                        if alpha == None or opti > alpha:
-                            alpha = opti
+                        if value != None:
+                            value = abs(value)
+                            if opti == None or value > opti:
+                                opti = value
+                            if alpha == None or opti > alpha:
+                                alpha = opti
 
             elif turn == 'min':
                 moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
@@ -298,12 +328,15 @@ class ExamplePlayer:
                     self.doMove(nextBoard,move)
                     if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
                         value = self.alphaBeta_pruning(nextBoard, colour, depth, 'max', opponentColour, alpha, beta)
-                        value = abs(value)
-                        if opti == None or value < opti: #opti = None for the first time
-                            opti = value
-                        if beta == None or opti < beta:
-                            beta = opti
+                        if value != None:
+                            value = abs(value)
+                            if opti == None or value < opti: #opti = None for the first time
+                                opti = value
+                            if beta == None or opti < beta:
+                                beta = opti
+            
             return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
+
 
         else: #Comes here for the last level i.e leaf nodes
             value = 0
@@ -316,48 +349,49 @@ class ExamplePlayer:
                 #An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
                 #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
                 #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                if self.colour == "white"  and turn == "max": # means that we calculate (Beta) value for opponent == "black"
-                    if board[position] == 1:
-                        value -= 2
-                    elif board[position] <= -1:
-                        value += 2
-                    elif board[position] > 1:
-                        value -= 3
-                    # elif board[position] < -1:
-                    #     value += 3
-                elif self.colour == "black" and turn == "max": # means that we calculate (Beta) value for opponent == "white"
-                    if board[position] >= 1:
-                        value += 2
-                    elif board[position] == -1:
-                        value -= 2
-                    # elif board[position] > 1:
-                    #     value += 3
-                    elif board[position] < -1:
-                        value -= 3
-                elif self.colour == "white" and turn == "min": # means that we calculate (Alpha) value for us if we are the "white" player
-                    if board[position] >= 1:
-                        value += 2
-                    elif board[position] == -1:
-                        value -= 2
-                    # elif board[position] > 1:
-                    #     value += 3
-                    elif board[position] < -1:
-                        value -= 3
-                elif self.colour == "white" and turn == "min": # means that we calculate (Alpha) value for us if we are the "black" player
-                    if board[position] == 1:
-                        value -= 2
-                    elif board[position] <= -1:
-                        value += 2
-                    elif board[position] > 1:
-                        value -= 3
-                    # elif board[position] < -1:
-                    #     value += 3
+                # if self.colour == "white"  and turn == "max": # means that we calculate (Beta) value for opponent == "black"
+                #     if board[position] == 1:
+                #         value -= 2
+                #     elif board[position] <= -1:
+                #         value += 2
+                #     elif board[position] > 1:
+                #         value -= 3
+                #     # elif board[position] < -1:
+                #     #     value += 3
+                # elif self.colour == "black" and turn == "max": # means that we calculate (Beta) value for opponent == "white"
+                #     if board[position] >= 1:
+                #         value += 2
+                #     elif board[position] == -1:
+                #         value -= 2
+                #     # elif board[position] > 1:
+                #     #     value += 3
+                #     elif board[position] < -1:
+                #         value -= 3
+                # elif self.colour == "white" and turn == "min": # means that we calculate value for us (Alpha) if we are the "white" player
+                #     if board[position] >= 1:
+                #         value += 2
+                #     elif board[position] == -1:
+                #         value -= 2
+                #     # elif board[position] > 1:
+                #     #     value += 3
+                #     elif board[position] < -1:
+                #         value -= 3
+                # elif self.colour == "white" and turn == "min": # means that we calculate value for us (Alpha) if we are the "black" player
+                #     if board[position] == 1:
+                #         value -= 2
+                #     elif board[position] <= -1:
+                #         value += 2
+                #     elif board[position] > 1:
+                #         value -= 3
+                #     # elif board[position] < -1:
+                #     #     value += 3
+                value += board[position]
 
             return value
 
     # display board
     def print_board_prototype(self, board):
-        # print(board)
+
         new_board = []
         i=0
         j=8
