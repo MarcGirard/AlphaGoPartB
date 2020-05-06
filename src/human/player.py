@@ -3,6 +3,8 @@ from collections import Counter
 import copy
 import time
 import math
+import random
+import ast
 
 class ExamplePlayer:
     def __init__(self, colour):
@@ -51,42 +53,18 @@ class ExamplePlayer:
         # TODO: Decide what action to take, and return it
 
         startTimer = time.time()
-        # print("time remaining", self.timeRemaining)
-        depth = 3
         bestMove = None
-        if self.isAnyMovePossible() == True:
-            moves = self.getAllPossibleMoves(self.board, self.colour)
-            #Changing the number of ply for minimax tree to budget time and get best possible moves         
-            # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
-            if self.timeRemaining < 3:
-                depth = 1
-            elif self.timeRemaining < 10:
-                depth = 2
-            elif self.timeRemaining < 30:
-                depth = 3
-            else:
-                if self.movesRemaining > 65:
-                    depth = 4
-                else:
-                    depth = 3
 
-            
-            best = None
-            alpha = None
-            beta = float("inf")
-            for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
-                newBoard = copy.deepcopy(self.board)
-                self.doMove(newBoard,move)
-                #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
-                moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-                if moveVal != None:
-                    if best == None or moveVal > best:
-                        bestMove = move
-                        best = moveVal
-                    if alpha == None or best > alpha:
-                        alpha = best
-        else:
-            print("No Possible move!")
+        moved = False
+        while moved == False:
+            print('Possible moves:', self.getAllPossibleMoves(self.board, self.colour))
+            bestMove = input("Please enter your move(" + self.colour + "): ")
+            try:
+                bestMove = ast.literal_eval(bestMove)
+            except:
+                print("\nWrong input, try again:\n")
+            if (len(bestMove) == 4 and bestMove[0] == "MOVE") or (len(bestMove) == 2 and bestMove[0] == "BOOM"):
+                moved = True
 
         stopTimer =  time.time()
         self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
@@ -329,94 +307,7 @@ class ExamplePlayer:
                     if board[(x+i,y+j)] != 0: # if there is a token on position (i,j)
                         board[(x+i,y+j)] = 0
                         self.checkCollateralBOOM(board, x+i, y+j)
-
-
-    # Alpha Beta pruning algorithm
-    def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
-        if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
-            depth -= 1
-            opti = None
-            if turn == 'max' and self.isAnyMovePossible() == True:
-                moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
-                for move in moves:
-                    nextBoard = copy.deepcopy(board)
-                    self.doMove(nextBoard,move)
-                    if opti == None or beta > opti:
-                        value = self.alphaBeta_pruning(nextBoard, colour, depth, 'min', opponentColour, alpha, beta)
-                        if value != None:
-                            if opti == None or value > opti:
-                                opti = value
-                            if alpha == None or opti > alpha:
-                                alpha = opti
-
-            elif turn == 'min' and self.isAnyMovePossible() == True:
-                moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
-                for move in moves:
-                    nextBoard = copy.deepcopy(board)
-                    self.doMove(nextBoard,move)
-                    if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
-                        value = self.alphaBeta_pruning(nextBoard, colour, depth, 'max', opponentColour, alpha, beta)
-                        if value != None:
-                            if opti == None or value < opti: #opti = None for the first time
-                                opti = value
-                            if beta == None or opti < beta:
-                                beta = opti
-            
-            return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
-
-
-        else: #Comes here for the last level i.e leaf nodes
-            value = 0
-            # self.print_board_prototype(board)
-            # input("Press the <ENTER> key to continue...")
-            for position, nb_token in board.items():
-                x, y = position
-                #Below, we count the number of token in a stack for each colour.
-                #A player stack of more than 1 token is 1.5 times more valuable than a stack of 1 token.
-                #An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
-                #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
-                #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                # if self.colour == "white"  and turn == "max": # means that we calculate (Beta) value for opponent == "black"
-                #     if board[position] == 1:
-                #         value -= 2
-                #     elif board[position] == -1:
-                #         value += 2
-                #     elif board[position] > 1:
-                #         value -= 3
-                #     elif board[position] < -1:
-                #         value += 3
-                # elif self.colour == "black" and turn == "max": # means that we calculate (Beta) value for opponent == "white"
-                #     if board[position] == 1:
-                #         value += 2
-                #     elif board[position] == -1:
-                #         value -= 2
-                #     elif board[position] > 1:
-                #         value += 3
-                #     elif board[position] < -1:
-                #         value -= 3
-                # elif self.colour == "white" and turn == "min": # means that we calculate value for us (Alpha) if we are the "white" player
-                #     if board[position] == 1:
-                #         value += 2
-                #     elif board[position] == -1:
-                #         value -= 2
-                #     elif board[position] > 1:
-                #         value += 3
-                #     elif board[position] < -1:
-                #         value -= 3
-                # elif self.colour == "white" and turn == "min": # means that we calculate value for us (Alpha) if we are the "black" player
-                #     if board[position] == 1:
-                #         value -= 2
-                #     elif board[position] == -1:
-                #         value += 2
-                #     elif board[position] > 1:
-                #         value -= 3
-                #     elif board[position] < -1:
-                #         value += 3
-
-                # first attempt
-                value += board[position]
-
-            return value
+       
 
     # display board
     def print_board_prototype(self, board):
