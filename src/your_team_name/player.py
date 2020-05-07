@@ -36,9 +36,15 @@ class ExamplePlayer:
                         (0,6), (1,6),   (3,6), (4,6),   (6,6), (7,6)]
 
         for xy in white_tokens:
-            self.board[xy] = +1
+            if colour == "white":
+                self.board[xy] = +1
+            else:
+                self.board[xy] = -1
         for xy in black_tokens:
-            self.board[xy] = -1
+            if colour == "black":
+                self.board[xy] = +1
+            else:
+                self.board[xy] = -1
 
         # print(self.board)
 
@@ -100,12 +106,17 @@ class ExamplePlayer:
                         booms.append(near_square)
             
         else:
-            if colour == "white":
-                self.board[action[2]] -= action[1]
-                self.board[action[3]] += action[1]
+            nb_token_moved = action[1]
+            start_position = action[2]
+            end_position = action[3]
+            if self.board[start_position] > 0:
+                self.board[start_position] -= nb_token_moved
+                self.board[end_position] += nb_token_moved
+            elif self.board[start_position] < 0:
+                self.board[start_position] += nb_token_moved
+                self.board[end_position] -= nb_token_moved
             else:
-                self.board[action[2]] += action[1]
-                self.board[action[3]] -= action[1]
+                print("Action ERROR")
 
             
     # Returns whether any of the <colour> pieces can make a valid move at this time
@@ -143,7 +154,7 @@ class ExamplePlayer:
         if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or x1 > 7 or y1 > 7 or x2 > 7 or y2 > 7:
             return False
         #check (x2,y2) position if non-empty
-        if self.board[(x2,y2)] != 0:
+        if self.board[(x2,y2)] < 0:
             return False
 
         return True
@@ -156,12 +167,12 @@ class ExamplePlayer:
             x, y = position
             
             # Check if this position has a enemy token next to him
-            if nb_token > 0 and self.colour == "white":
+            if nb_token >= 1 and self.colour == "white":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
                         if self.board[(i,j)] < 0:
                             return True
-            elif nb_token < 0 and self.colour == "black":
+            elif nb_token <= -1 and self.colour == "black":
                 for i in range(x-1,x+2):
                     for j in range(y-1,y+2):
                         if self.board[(i,j)] > 0:
@@ -178,7 +189,7 @@ class ExamplePlayer:
             x, y = position
             
             # MOVE action
-            if (nb_token > 0 and colour == "white") or (nb_token < 0 and colour == "black"):
+            if (nb_token > 0):
                 n = abs(nb_token)
                 for i in range(1,n+1):
                     # Can move left
@@ -194,27 +205,19 @@ class ExamplePlayer:
                     if self.canMoveToPosition(x, y, x, y+i) == True:                                
                         moves.append(("MOVE", i, (x, y), (x, y+i)))
                 
-            # # BOOM action
-            # if nb_token > 0 and colour == "white":
-            #     for i in range(x-1,x+2):
-            #         for j in range(y-1,y+2):
-            #             # if there is a close enemy
-            #             if i>=0 and i<=7 and j>=0 and j<=7:
-            #                 if board[(i,j)] < 0:
-            #                     moves.append(("BOOM", (x, y)))
-            # elif nb_token < 0 and colour == "black":
-            #     for i in range(x-1,x+2):
-            #         for j in range(y-1,y+2):
-            #             # if there is a close enemy
-            #             if i>=0 and i<=7 and j>=0 and j<=7:
-            #                 if board[(i,j)] > 0:
-            #                     moves.append(("BOOM", (x, y)))   
+            # BOOM action
+            if nb_token > 0:
+                for i in range(x-1,x+2):
+                    for j in range(y-1,y+2):
+                        # if there is a close enemy
+                        if i>=0 and i<=7 and j>=0 and j<=7:
+                            if board[(i,j)] < 0:
+                                moves.append(("BOOM", (x, y)))
 
-            # # BOOM action
-            if nb_token > 0 and colour == "white":
-                moves.append(("BOOM", (x, y)))
-            elif nb_token < 0 and colour == "black":
-                moves.append(("BOOM", (x, y)))
+            # # # BOOM action
+            # if nb_token > 0 :
+            #     moves.append(("BOOM", (x, y)))
+
 
         return moves
 
