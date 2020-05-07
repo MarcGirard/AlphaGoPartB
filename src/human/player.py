@@ -155,7 +155,6 @@ class ExamplePlayer:
     # check distance between the current token and each enemy position
     def checkDistance(self, board, colour, xa, ya, xb, yb):
         best_dist = 1000
-        i=0
         save_best_pos = 1000
         # compute euclidean distance between :
         #   - initial position and each enemy token
@@ -173,9 +172,10 @@ class ExamplePlayer:
             elif colour == "black" and nb_token > 0:
                 dist_initial_state = math.sqrt( (xa-position[0])**2 + (ya-position[1])**2 )
                 dist_final_state = math.sqrt( (xb-position[0])**2 + (yb-position[1])**2 )
-                if dist_final_state < dist_initial_state:
-                    if best_dist == None or dist_final_state < best_dist:
-                        best_dist = dist_final_state
+                if dist_initial_state < save_best_pos:
+                    save_best_pos = dist_initial_state
+                if dist_initial_state < best_dist and dist_final_state < dist_initial_state and dist_final_state < save_best_pos:
+                    best_dist = dist_initial_state
         
         if best_dist == 1000:
             return False
@@ -241,19 +241,23 @@ class ExamplePlayer:
             # Can move left
             if self.canMoveToPosition(x, y, x-i, y) == True:
                 if self.checkDistance(board, colour, x, y, x-i, y) == True: 
-                    moves.append(("MOVE", i, (x, y), (x-i, y)))
+                    for j in range(1,i+1):
+                        moves.append(("MOVE", j, (x, y), (x-i, y)))
             # Can move right
             if self.canMoveToPosition(x, y, x+i, y) == True:  
-                if self.checkDistance(board, colour, x, y, x+i, y) == True:   
-                    moves.append(("MOVE", i, (x, y), (x+i, y)))
+                if self.checkDistance(board, colour, x, y, x+i, y) == True: 
+                    for j in range(1,i+1):  
+                        moves.append(("MOVE", j, (x, y), (x+i, y)))
             # Can move down
             if self.canMoveToPosition(x, y, x, y-i) == True:                                
                 if self.checkDistance(board, colour, x, y, x, y-i) == True:  
-                    moves.append(("MOVE", i, (x, y), (x, y-i)))
+                    for j in range(1,i+1):
+                        moves.append(("MOVE", j, (x, y), (x, y-i)))
             # Can move up    
             if self.canMoveToPosition(x, y, x, y+i) == True:                                
                 if self.checkDistance(board, colour, x, y, x, y+i) == True:  
-                    moves.append(("MOVE", i, (x, y), (x, y+i)))
+                    for j in range(1,i+1):
+                        moves.append(("MOVE", j, (x, y), (x, y+i)))
 
         return moves, isBoom
 

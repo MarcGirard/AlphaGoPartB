@@ -3,6 +3,13 @@ from collections import Counter
 import copy
 import time
 import math
+import random
+import ast
+
+'''
+Simple Greedy just has a simpleGreedy function where my tokens should be more than my opponent's
+A move on the board which maximizes my tokens is the best move
+'''
 
 class ExamplePlayer:
     def __init__(self, colour):
@@ -51,48 +58,20 @@ class ExamplePlayer:
         # TODO: Decide what action to take, and return it
 
         startTimer = time.time()
-        # print("time remaining", self.timeRemaining)
-        depth = 5
-        bestMove = None
-        if self.isAnyMovePossible() == True:
-            moves = self.getAllPossibleMoves(self.board, self.colour)
-            #Changing the number of ply for minimax tree to budget time and get best possible moves         
-            # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
-            if self.timeRemaining < 5:
-                depth = 3
-            if self.timeRemaining < 15:
-                depth = 4
-            elif self.timeRemaining < 25:
-                depth = 5
-            elif self.movesRemaining > 40:
-                depth = 5
-            
-            best = None
-            bestMove == None
-            alpha = None
-            beta = float("inf")
-            for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
-                newBoard = copy.deepcopy(self.board)
-                self.doMove(newBoard,move)
-                #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
-                moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-                # print("move val: ", moveVal, move)
-                # input("Press ENTER")
-                if moveVal != None:
-                    if best == None or moveVal > best:
-                        bestMove = move
-                        best = moveVal
-                    if alpha == None or best > alpha:
-                        alpha = best
-            if bestMove == None:
-                bestMove = moves[0]
-        else:
-            print("No Possible move!")
+
+        best = None
+        moves = self.getAllPossibleMoves(self.board, self.colour)
+        for move in moves:
+            newBoard = copy.deepcopy(self.board)
+            self.doMove(newBoard,move)
+            moveVal = self.simpleGreedy(newBoard, self.colour)
+            if best == None or moveVal > best:
+                bestMove = move
+                best = moveVal
 
         stopTimer =  time.time()
         self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
         self.movesRemaining = self.movesRemaining - 1
-
 
         return bestMove
 
@@ -135,6 +114,25 @@ class ExamplePlayer:
                 self.board[end_position] -= nb_token_moved
             else:
                 print("Action ERROR")
+
+    # Simple greedy algorithm
+    def simpleGreedy(self, board, colour):
+        # Count how many more pieces I have than the opponent
+        if colour == "white":
+            opponentColour = "black"
+        else:
+            opponentColour = "white"
+        
+        value = 0
+        # Loop through all board positions
+        for position, nb_token in self.board.items():                 
+            if (colour == "white" and board[position] > 0) or (colour == "black" and board[position] < 0):
+                value = value + 1
+            elif (colour == "white" and board[position] < 0) or (colour == "black" and board[position] > 0):
+                value = value - 1
+        
+        return value
+
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self):
@@ -300,6 +298,7 @@ class ExamplePlayer:
                     if x+i >= 0 and y+j >= 0 and x+i <= 7 and y+j <= 7: # if (i,j) is inside the board
                         if board[(x+i,y+j)] > 0: # if there is an enemy token
                             boom_moves.append(("BOOM", (x, y)))
+
         return boom_moves
 
 
@@ -334,73 +333,7 @@ class ExamplePlayer:
                     if board[(x+i,y+j)] != 0: # if there is a token on position (i,j)
                         board[(x+i,y+j)] = 0
                         self.checkCollateralBOOM(board, x+i, y+j)
-
-
-    # Alpha Beta pruning algorithm
-    def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
-        if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
-            depth -= 1
-            opti = None
-            if turn == 'max' and self.isAnyMovePossible() == True:
-                moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
-                for move in moves:
-                    nextBoard = copy.deepcopy(board)
-                    self.doMove(nextBoard,move)
-                    if opti == None or beta > opti:
-                        value = self.alphaBeta_pruning(nextBoard, colour, depth, 'min', opponentColour, alpha, beta)
-                        if value != None:
-                            if opti == None or value > opti:
-                                opti = value
-                            if alpha == None or opti > alpha:
-                                alpha = opti
-                            # print('move depth:', depth, move)
-
-            elif turn == 'min' and self.isAnyMovePossible() == True:
-                moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
-                for move in moves:
-                    nextBoard = copy.deepcopy(board)
-                    self.doMove(nextBoard,move)
-                    if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
-                        value = self.alphaBeta_pruning(nextBoard, colour, depth, 'max', opponentColour, alpha, beta)
-                        if value != None:
-                            if opti == None or value < opti: #opti = None for the first time
-                                opti = value
-                            if beta == None or opti < beta:
-                                beta = opti
-                            # print('move depth:', depth, move)
-            
-            return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
-
-
-        else: #Comes here for the last level i.e leaf nodes
-            value = 0
-            # self.print_board_prototype(board)
-            # input("Press the <ENTER> key to continue...")
-            for position, nb_token in board.items():
-                x, y = position
-                #Below, we count the number of token in a stack for each colour.
-                #A player stack of more than 1 token is 1.5 times more valuable than a stack of 1 token.
-                #An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
-                #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
-                #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                # second attempt
-                if (colour == "white" and board[position] == 1) or (colour == "black" and board[position] == -1): # if my colour and position has 1 token
-                    value += 1
-                elif (colour == "white" and board[position] == -1) or (colour == "black" and board[position] == 1): # if opponent colour and position has 1 token
-                    value -= 1
-                elif (colour == "white" and board[position] > 1) or (colour == "black" and board[position] < -1): # if my colour and position has stack of tokens
-                    value += (board[position] *1.2)
-                elif (colour == "white" and board[position] < -1) or (colour == "black" and board[position] > 1): # if opponent colour and position has stack of tokens
-                    value -= (board[position] *1.5)
-
-                # first attempt
-                # if (colour == "white" and board[position] > 0) or (colour == "black" and board[position] < 0): # if my colour and position has 1 token
-                #     value += board[position]
-                # elif (colour == "white" and board[position] < 0) or (colour == "black" and board[position] > 0): # if opponent colour and position has 1 token
-                #     value += board[position]
-
-            # print('val: ', value)
-            return value
+       
 
     # display board
     def print_board_prototype(self, board):
@@ -428,6 +361,3 @@ class ExamplePlayer:
             stri += '-'*50
 
         print(stri.expandtabs(3))
-
-            
-
