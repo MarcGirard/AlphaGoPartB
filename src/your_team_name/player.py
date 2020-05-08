@@ -27,6 +27,9 @@ class ExamplePlayer:
         self.movesRemaining = 250
         self.timeRemaining = 60
 
+        self.total_nb_token_left = 0
+        self.save_last_board_states = []
+
         self.board = {(x, y):0 for x in range(8) for y in range(8)}
 
         white_tokens = [(0,1), (1,1),   (3,1), (4,1),   (6,1), (7,1),
@@ -51,17 +54,21 @@ class ExamplePlayer:
         # TODO: Decide what action to take, and return it
 
         startTimer = time.time()
-        # print("time remaining", self.timeRemaining)
-        # depth = 4
-        bestMove = None
-        if self.isAnyMovePossible(self.board, self.colour) == True:
-            moves = self.getAllPossibleMoves(self.board, self.colour)
-            # print(moves)
-            #Changing the number of ply for minimax tree to budget time and get best possible moves         
-            # If the time remaining < 3 seconds, then just apply simpleGreedy and increase depth according to time
+        depth = 3
+
+        # compute nb of token left for current player
+        for position, nb_token in self.board.items():
+            if self.colour == "white" and nb_token > 0:
+                self.total_nb_token_left += nb_token
+            elif self.colour == "black" and nb_token < 0:
+                self.total_nb_token_left += abs(nb_token)
+
+        #Changing the number of ply for minimax tree to budget time and get best possible moves
+        # conditions regarding the amount of time left, the nb of remaining move left and the nb of token current player has
+        if self.total_nb_token_left > 6:
             if self.timeRemaining < 5:
                 depth = 2
-            if self.timeRemaining < 15:
+            elif self.timeRemaining < 15: # modify value?
                 depth = 3
             elif self.timeRemaining < 30:
                 depth = 3
@@ -71,25 +78,41 @@ class ExamplePlayer:
                 elif self.movesRemaining > 40:
                     depth = 3
                 else:
-                    depth = 3
-            
+                    depth = 4
+        else:
+            if self.timeRemaining < 5:
+                depth = 3
+            elif self.timeRemaining < 15:
+                depth = 3
+            elif self.timeRemaining > 20:
+                depth = 4
+
+        # if a move is possible -> play
+        if self.isAnyMovePossible(self.board, self.colour) == True:
+            moves = self.getAllPossibleMoves(self.board, self.colour) # get all possible move
+                
             best = None
-            bestMove == None
+            bestMove = None
             alpha = None
             beta = None
             for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
                 newBoard = copy.deepcopy(self.board)
+                # perform move
                 self.doMove(newBoard,move)
-                #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
-                moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-                if moveVal != None:
-                    if best == None or moveVal > best:
-                        bestMove = move
-                        best = moveVal
-                    if alpha == None or best > alpha:
-                        alpha = best
-            if bestMove == None:
-                bestMove = moves[0]
+                # check state of board
+                is_repeated_state = self.checkRepeatedBoardState(newBoard)
+                if is_repeated_state == False:
+                    #Beta is always None here as there is no parent MIN node. So no need to check if we can prune or not.
+                    moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
+                    if moveVal != None:
+                        if best == None or moveVal > best:
+                            bestMove = move
+                            best = moveVal
+                        if alpha == None or best > alpha:
+                            alpha = best
+                    if bestMove == None: # not possible normally
+                        bestMove = moves[0]                   
+
         else:
             print("No Possible move!")
 
@@ -99,6 +122,25 @@ class ExamplePlayer:
 
         return bestMove
 
+    def checkRepeatedBoardState(self, board):
+        # convert to list and sort
+        dic_to_list = [(k, v) for k, v in board.items()]
+        # dic_to_list.sort(key = lambda x: x[0])
+        # count = self.save_last_board_states.count(board) # count occurence
+        count = 0
+        for i in range(len(self.save_last_board_states)):
+            flag = True
+            for j in range(len(dic_to_list)):
+                if dic_to_list[j] != self.save_last_board_states[i][j]:
+                    flag = False
+                    continue
+            if flag == True:
+                count += 1
+
+        # if state of board has occurred more than twice, disregard current move (flag to True)
+        if count > 1:
+            return True
+        return False
 
     def update(self, colour, action):
         """
@@ -138,6 +180,16 @@ class ExamplePlayer:
                 self.board[end_position] -= nb_token_moved
             else:
                 print("Action ERROR")
+
+        # save up to 10 last states of the board and add to save state list
+        # if len(self.save_last_board_states) == 10:
+        #     self.save_last_board_states.pop(0)
+        dic_to_list = [(k, v) for k, v in self.board.items()] 
+        # print(dic_to_list)
+        # dic_to_list.sort(key = lambda x: x[0])
+        self.save_last_board_states.append(copy.deepcopy(dic_to_list))
+        # if len(self.save_last_board_states) == 10:
+        #     print(self.save_last_board_states)
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self, board, colour):
@@ -315,14 +367,15 @@ class ExamplePlayer:
             opti = None
             if turn == 'max' and self.isAnyMovePossible(board, colour) == True:
                 moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
+                # print(moves)
                 for move in moves:
                     # print("current move alpha and depth", depth, move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
-                    if opti == None or beta == None or beta > opti:
+                    if opti == None or beta == None or beta > opti: #None conditions are to check for the first times
                         value = self.alphaBeta_pruning(nextBoard, colour, depth, 'min', opponentColour, alpha, beta)
                         if value != None:
-                            if opti == None or value > opti: # for us alpha needs to be the smallest as possible
+                            if opti == None or value > opti:
                                 opti = value
                             if alpha == None or opti > alpha:
                                 alpha = opti
@@ -336,7 +389,7 @@ class ExamplePlayer:
                     if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
                         value = self.alphaBeta_pruning(nextBoard, colour, depth, 'max', opponentColour, alpha, beta)
                         if value != None:
-                            if opti == None or value < opti: # for us beta needs to be the biggest as possible
+                            if opti == None or value < opti: 
                                 opti = value
                             if beta == None or opti < beta:
                                 beta = opti
