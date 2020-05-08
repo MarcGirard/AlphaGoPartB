@@ -4,20 +4,6 @@ import copy
 import time
 import random
 
-WhiteInitialMoves = [('MOVE', 1, (0, 0), (0, 1)),
-('MOVE', 1, (0, 1), (0, 3)),
-('MOVE', 1, (3, 0), (3, 1)),
-('MOVE', 1, (3, 1), (3, 3)),
-('MOVE', 1, (6, 0), (6, 1)),
-('MOVE', 1, (6, 1), (6, 3))]
-
-BlackInitialMoves = [('MOVE', 1, (0, 7), (0, 6)),
-('MOVE', 1, (0, 6), (0, 4)),
-('MOVE', 1, (3, 7), (3, 6)),
-('MOVE', 1, (3, 6), (3, 4)),
-('MOVE', 1, (6, 7), (6, 6)),
-('MOVE', 1, (6, 6), (6, 4))]
-
 
 class ExamplePlayer:
     def __init__(self, colour):
@@ -78,15 +64,6 @@ class ExamplePlayer:
         alpha = None
         beta = float("inf")
 
-        if self.colour == 'white':
-            initialMoves = WhiteInitialMoves
-        if self.colour == 'black':
-            initialMoves = BlackInitialMoves
-
-        while(len(initialMoves) != 0):
-
-            return initialMoves.pop(0)
-
 
         # TODO: Decide what action to take, and return it
 
@@ -110,16 +87,15 @@ class ExamplePlayer:
             else:
                 self.depth = 2
 #       
-        equalMoves = []
+        
         print("depth:", self.depth)
         for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
             newBoard = copy.deepcopy(self.board)
             self.doMove(newBoard,move)
             #Beta is always inf here as there is no parent MIN node. So no need to check if we can prune or not.
-            print("init",move)
             moveVal = self.alphaBeta_pruning(newBoard, self.colour, self.depth, 'min', self.opponentColour, alpha, beta)
-            print("final",move,moveVal)
-            
+            # print(move,moveVal)
+            equalMoves = []
 
             if moveVal[0] == None:
                 moveVal[0] = -float("inf")
@@ -129,7 +105,7 @@ class ExamplePlayer:
                 best = moveVal[0]
                 equalMoves = []
 
-            elif moveVal[0] == best and move[0] == "MOVE":
+            elif  moveVal[0] == best:
                 equalMoves.append((moveVal[1],move))
 
 
@@ -138,7 +114,6 @@ class ExamplePlayer:
         
 
         if len(equalMoves) != 0:
-            print("equal moves", equalMoves)
             if self.colour == "white":
                 equalMoves.sort(key = lambda x: x[0])
             else:
@@ -276,7 +251,7 @@ class ExamplePlayer:
             x, y = position
             
             # MOVE action
-            if (nb_token > 0 and colour == self.colour) or (nb_token < 0 and colour == self.opponentColour):
+            if (nb_token > 0 ):
                 n = abs(nb_token)
                 for i in range(1,n+1):
                     # Can move left
@@ -301,21 +276,21 @@ class ExamplePlayer:
             #                 if board[(i,j)] < 0:
             #                     moves.append(("BOOM", (x, y)))  
 
-            if (nb_token > 0 and colour == self.colour) or (nb_token < 0 and colour == self.opponentColour) :
+            if nb_token > 0 :
                 booms.append(("BOOM", (x, y)))
         
         # print(booms,moves)
 
         # ordering moves
-        if self.colour == 'white':
+        if colour == 'white':
             booms.sort(key = lambda x: x[1][1], reverse=True)
             moves.sort(key = lambda x: x[3][1], reverse=True)
-        if self.colour == 'black':
+        else:
             booms.sort(key = lambda x: x[1][1])
             moves.sort(key = lambda x: x[3][1])
 
         # print(booms, moves)
-        return moves + booms
+        return booms+moves
 
     def doMove(self, board, move, lastlayer=True):
         # Will perform the move
@@ -347,12 +322,21 @@ class ExamplePlayer:
     def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
         if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
             depth -= 1
-            opti = [None, None]
+            opti =[None, None]
+
+            if self.depth - depth == 1:
+                preStacks =  {token for token in self.board if self.board[token] > 0}
+                preClusters = find_explosion_groups(self.board, preStacks)
+                posStacks =  {token for token in board if board[token] > 0}
+                posClusters =  find_explosion_groups(self.board, posStacks)
+                nb_preClusters = sum([len(clus) for clus in preClusters if len(clus) > 1 or self.board[list(list(clus))[0]] > 1])
+                nb_posClusters = sum([len(clus) for clus in posClusters if len(clus) > 1 or board[list(list(clus))[0]] > 1])
+                opti[1] = nb_posClusters - nb_preClusters
+
 
             if turn == 'max':
                 moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
                 for move in moves:
-                    print(move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
                     if opti[0] == None or beta > opti[0]:
@@ -371,7 +355,6 @@ class ExamplePlayer:
                 moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
 
                 for move in moves:
-                    print(move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
                     if alpha == None or opti[0] == None or alpha < opti[0]: #None conditions are to check for the first times
@@ -384,23 +367,11 @@ class ExamplePlayer:
                             opti[0] = value
                         if opti[0] < beta:
                             beta = opti[0]
-            
-
-            if self.depth - depth == 1:
-                preStacks =  {token for token in self.board if self.board[token] > 0}
-                preClusters = find_explosion_groups(self.board, preStacks)
-                posStacks =  {token for token in board if board[token] > 0}
-                posClusters =  find_explosion_groups(self.board, posStacks)
-                nb_preClusters = sum([len(clus) for clus in preClusters if len(clus) > 1 or self.board[list(list(clus))[0]] > 1])
-                nb_posClusters = sum([len(clus) for clus in posClusters if len(clus) > 1 or board[list(list(clus))[0]] > 1])
-                opti[1] = nb_posClusters - nb_preClusters
 
             return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
 
         else: #Comes here for the last level i.e leaf nodes
-
-            ivalue = 0
-            fvalue = 0
+            value = 0
 
             for position, nb_token in board.items():
                 # Below, we count the number of token in a stack for each colour.
@@ -409,37 +380,29 @@ class ExamplePlayer:
                 # By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
                 # It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
                 if board[position] == 1:
-                    ivalue += 1
+                    value += 1
                 elif board[position] == -1:
-                    ivalue -= 1
+                    value -= 1
                 elif board[position] > 1:
-                    ivalue += nb_token
+                    value += nb_token
                 elif board[position] < -1:
-                    ivalue -= nb_token
+                    value -= nb_token
 
-                # if self.board[position] == 1:
-                #     fvalue += 1
-                # elif self.board[position] == -1:
-                #     fvalue -= 1
-                # elif self.board[position] > 1:
-                #     fvalue += nb_token
-                # elif self.board[position] < -1:
-                #     fvalue -= nb_token
-                
-            # value = fvalue - ivalue
-            value = ivalue
-
-            if value == 0:
-                # Change in number of our tokens
-                deltaSelf = abs(sum([board[position] for position in board if board[position] > 0 ])) - abs(sum([self.board[position] for position in self.board if self.board[position] > 0 ]))
-
-                # Change in number of opponent tokens
-                deltaOpponent = abs(sum([board[position] for position in board if board[position] < 0 ])) - abs(sum([self.board[position] for position in self.board if self.board[position] < 0 ]))
-
-                if deltaOpponent != 0 and deltaSelf != 0:               
-                    value += (abs(deltaOpponent)/abs(deltaSelf))
             
-            print(value)
+            
+            # # Change in number of our tokens
+            # deltaSelf = abs(sum([board[position] for position in board if board[position] > 0 ])) - abs(sum([self.board[position] for position in self.board if self.board[position] > 0 ]))
+
+            # # Change in number of opponent tokens
+            # deltaOpponent = sum([board[position] for position in board if board[position] < 0 ]) - sum([self.board[position] for position in self.board if self.board[position] < 0 ])
+
+            # print("deltas",deltaOpponent,deltaSelf)
+            # if deltaSelf == 0:
+            #     deltaSelf = 0.000000002
+
+            # value = abs(deltaOpponent)/abs(deltaSelf)
+
+
             return value
 
 
@@ -496,3 +459,4 @@ def find_explosion_groups(BOARD_SQUARES,targets):
                 groups[top] = {t}
         # return the partition
         return {frozenset(group) for group in groups.values()}
+
