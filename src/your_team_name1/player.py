@@ -99,16 +99,16 @@ class ExamplePlayer:
         
     #Changing the number of ply for minimax tree to budget time and get best possible moves         
         if self.timeRemaining < 4:
-            self.depth = 2
+            self.depth = 6
         elif self.timeRemaining < 10:
-            self.depth = 2
+            self.depth = 4
         elif self.timeRemaining < 30:
-            self.depth = 2
+            self.depth = 4
         else:
             if self.movesRemaining > 65:
                 self.depth = 2
             else:
-                self.depth = 2
+                self.depth = 4
 #       
         equalMoves = []
         print("depth:", self.depth)
@@ -138,11 +138,14 @@ class ExamplePlayer:
         
 
         if len(equalMoves) != 0:
-            print("equal moves", equalMoves)
-            if self.colour == "white":
-                equalMoves.sort(key = lambda x: x[0])
-            else:
-                equalMoves.sort(key = lambda x: x[0], reverse=True)
+
+            equalMoves.sort(key = lambda x: x[0])
+
+            # print("equal moves", equalMoves)
+            # if self.colour == "white":
+            #     equalMoves.sort(key = lambda x: x[1][3][1], reverse=True)
+            # else:
+            #     equalMoves.sort(key = lambda x: x[1]][3][1])
             bestMove = equalMoves[0][1]
 
 
@@ -270,7 +273,7 @@ class ExamplePlayer:
         booms = []
         moves = []
         
-        
+        print(board)
         # Loop through all board positions
         for position, nb_token in board.items():
             x, y = position
@@ -307,21 +310,21 @@ class ExamplePlayer:
         # print(booms,moves)
 
         # ordering moves
-        if self.colour == 'white':
+        if colour == 'white':
             booms.sort(key = lambda x: x[1][1], reverse=True)
             moves.sort(key = lambda x: x[3][1], reverse=True)
-        if self.colour == 'black':
+        if colour == 'black':
             booms.sort(key = lambda x: x[1][1])
             moves.sort(key = lambda x: x[3][1])
 
-        # print(booms, moves)
-        return moves + booms
+        print(booms, moves)
+        return  booms+moves
 
-    def doMove(self, board, move, lastlayer=True):
+    def doMove(self, board, move):
         # Will perform the move
         if move[0] == "MOVE":
                 # print("it is a MOVE action")
-                if self.colour == "white":
+                if board[move[2]] > 0:
                     # next pos
                     board[move[3]] += move[1]
                     # current pos
@@ -352,7 +355,7 @@ class ExamplePlayer:
             if turn == 'max':
                 moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
                 for move in moves:
-                    print(move)
+                    print("max",move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
                     if opti[0] == None or beta > opti[0]:
@@ -371,7 +374,7 @@ class ExamplePlayer:
                 moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
 
                 for move in moves:
-                    print(move)
+                    print("min", move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
                     if alpha == None or opti[0] == None or alpha < opti[0]: #None conditions are to check for the first times
@@ -399,23 +402,22 @@ class ExamplePlayer:
 
         else: #Comes here for the last level i.e leaf nodes
 
-            ivalue = 0
-            fvalue = 0
+            value = 0
 
-            for position, nb_token in board.items():
-                # Below, we count the number of token in a stack for each colour.
-                # A player stack of more than 1 token is 1.5 times more valuable than a stack of 1 token.
-                # An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
-                # By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
-                # It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                if board[position] == 1:
-                    ivalue += 1
-                elif board[position] == -1:
-                    ivalue -= 1
-                elif board[position] > 1:
-                    ivalue += nb_token
-                elif board[position] < -1:
-                    ivalue -= nb_token
+            # for position, nb_token in board.items():
+            #     # Below, we count the number of token in a stack for each colour.
+            #     # A player stack of more than 1 token is 1.5 times more valuable than a stack of 1 token.
+            #     # An opponent stack of more than 1 token is 1.5 times worse for the player than a stack of 1 token.
+            #     # By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
+            #     # It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
+            #     if board[position] == 1:
+            #         value += 1
+            #     elif board[position] == -1:
+            #         value -= 1
+            #     elif board[position] > 1:
+            #         value += nb_token
+            #     elif board[position] < -1:
+            #         value -= nb_token
 
                 # if self.board[position] == 1:
                 #     fvalue += 1
@@ -427,8 +429,8 @@ class ExamplePlayer:
                 #     fvalue -= nb_token
                 
             # value = fvalue - ivalue
-            value = ivalue
-
+            value = sum(board.values())
+            print("alpa before the frac", value)
             if value == 0:
                 # Change in number of our tokens
                 deltaSelf = abs(sum([board[position] for position in board if board[position] > 0 ])) - abs(sum([self.board[position] for position in self.board if self.board[position] > 0 ]))
@@ -439,7 +441,7 @@ class ExamplePlayer:
                 if deltaOpponent != 0 and deltaSelf != 0:               
                     value += (abs(deltaOpponent)/abs(deltaSelf))
             
-            print(value)
+            print("alpa", value)
             return value
 
 
