@@ -113,63 +113,63 @@ class ExamplePlayer:
                 print("Action ERROR")
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
-    def isAnyMovePossible(self):
+    def isAnyMovePossible(self, board, colour):
         # Loop through all board positions
-        for position, nb_token in self.board.items():
+        for position, nb_token in board.items():
             x, y = position
             
             # Check if this position has our colour
-            if (nb_token > 0 and self.colour == "white") or (nb_token < 0 and self.colour == "black"):
+            if (nb_token > 0 and colour == "white") or (nb_token < 0 and colour == "black"):
                 nb_token = abs(nb_token)
                 for i in range(1,nb_token+1):
-                    if self.canMoveToPosition(x, y, x-i, y) == True:            
+                    if self.canMoveToPosition(board, colour, x, y, x-i, y) == True:            
                         # Can move left
                         return True
-                    if self.canMoveToPosition(x, y, x+i, y) == True:            
+                    if self.canMoveToPosition(board, colour, x, y, x+i, y) == True:            
                         # Can move right
                         return True
-                    if self.canMoveToPosition(x, y, x, y-i) == True:            
+                    if self.canMoveToPosition(board, colour, x, y, x, y-i) == True:            
                         # Can move down
                         return True
-                    if self.canMoveToPosition(x, y, x, y+i) == True:            
+                    if self.canMoveToPosition(board, colour, x, y, x, y+i) == True:            
                         # Can move up
                         return True
         
         # If it can eliminate an enemy token, it has move
-        if self.isBoomPossible() == True:
+        if self.isBoomPossible(board, colour) == True:
             return True
             
         return False
 
     # Check whether (x1,y1) can move to (x2,y2) in one move
-    def canMoveToPosition(self, x1, y1, x2, y2):
+    def canMoveToPosition(self, board, colour, x1, y1, x2, y2):
         # check if positions are inside the board
         if x1 < 0 or y1 < 0 or x2 < 0 or y2 < 0 or x1 > 7 or y1 > 7 or x2 > 7 or y2 > 7:
             return False
         #check (x2,y2) position if there is enemy token(s)
-        if (self.colour == "white" and self.board[(x2,y2)] < 0) or (self.colour == "black" and self.board[(x2,y2)] > 0):
+        if (colour == "white" and board[(x2,y2)] < 0) or (colour == "black" and board[(x2,y2)] > 0):
             return False
 
         return True
 
     # Returns whether any of the <colour> pieces can make a Boom
-    def isBoomPossible(self):
+    def isBoomPossible(self, board, colour):
         # Loop through all board positions
-        for position, nb_token in self.board.items():
+        for position, nb_token in board.items():
             x, y = position
             
             # Check if this position has a enemy token next to him
-            if nb_token > 0 and self.colour == "white":
+            if nb_token > 0 and colour == "white":
                 for i in range(-1,2):
                     for j in range(-1,2):
                         if x+i >= 0 and y+j >= 0 and x+i <= 7 and y+j <= 7: # if (i,j) is inside the board
-                            if self.board[(x+i,y+j)] < 0: # if there is an enemy token
+                            if board[(x+i,y+j)] < 0: # if there is an enemy token
                                 return True
-            elif nb_token < 0 and self.colour == "black":
+            elif nb_token < 0 and colour == "black":
                 for i in range(-1,2):
                     for j in range(-1,2):
                         if x+i >= 0 and y+j >= 0 and x+i <= 7 and y+j <= 7: # if (i,j) is inside the board
-                            if self.board[(x+i,y+j)] > 0: # if there is an enemy token
+                            if board[(x+i,y+j)] > 0: # if there is an enemy token
                                 return True  
         return False
 
