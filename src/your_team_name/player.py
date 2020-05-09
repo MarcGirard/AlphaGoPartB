@@ -3,6 +3,9 @@ from collections import Counter
 import copy
 import time
 import math
+import numpy as np
+from scipy.cluster.vq import vq, kmeans, whiten
+import operator
 
 class ExamplePlayer:
     def __init__(self, colour):
@@ -17,19 +20,9 @@ class ExamplePlayer:
         strings "white" or "black" correspondingly.
         """
         # TODO: Set up state representation.
-
         self.colour = colour
-        if self.colour == "white":
-            self.opponentColour = "black"
-        else:
-            self.opponentColour = "white"
 
-        self.movesRemaining = 250
-        self.timeRemaining = 60
-
-        self.total_nb_token_left = 0
-        self.save_last_board_states = []
-
+        # create and initialise the board
         self.board = {(x, y):0 for x in range(8) for y in range(8)}
 
         white_tokens = [(0,1), (1,1),   (3,1), (4,1),   (6,1), (7,1),
@@ -37,10 +30,31 @@ class ExamplePlayer:
         black_tokens = [(0,7), (1,7),   (3,7), (4,7),   (6,7), (7,7),
                         (0,6), (1,6),   (3,6), (4,6),   (6,6), (7,6)]
 
+        # fill up the board
         for xy in white_tokens:
             self.board[xy] = +1
         for xy in black_tokens:
             self.board[xy] = -1
+
+        if self.colour == "white":
+            self.opponentColour = "black"
+            # get my tokens and opponent's positions
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+        else:
+            self.opponentColour = "white"
+            # get my tokens and opponent's positions
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+
+        self.movesRemaining = 250
+        self.timeRemaining = 60
+
+        # compute nb of token left for each player
+        self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
+        self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
+
+        self.save_last_board_states = []
 
     def action(self):
         """
@@ -55,55 +69,55 @@ class ExamplePlayer:
 
         startTimer = time.time()
         depth = 3
-
-        # compute nb of token left for current player
-        for position, nb_token in self.board.items():
-            if self.colour == "white" and nb_token > 0:
-                self.total_nb_token_left += nb_token
-            elif self.colour == "black" and nb_token < 0:
-                self.total_nb_token_left += abs(nb_token)
-
-        #Changing the number of ply for minimax tree to budget time and get best possible moves
-        # conditions regarding the amount of time left, the nb of remaining move left and the nb of token current player has
-        if self.total_nb_token_left > 6:
-            if self.timeRemaining < 5:
-                depth = 2
-            elif self.timeRemaining < 15: # modify value?
-                depth = 3
-            elif self.timeRemaining < 30:
-                depth = 3
-            else:
-                if self.movesRemaining > 248: # play fast for first moves
-                    depth = 2
-                elif self.movesRemaining > 40:
-                    depth = 3
-                else:
-                    depth = 4
-        else:
-            if self.timeRemaining < 5:
-                depth = 3
-            elif self.timeRemaining < 15:
-                depth = 3
-            elif self.timeRemaining > 20:
-                depth = 4
+        bestMove = None
 
         # if a move is possible -> play
         if self.isAnyMovePossible(self.board, self.colour) == True:
-            moves = self.getAllPossibleMoves(self.board, self.colour) # get all possible move
+            #Changing the number of ply for minimax tree to budget time and get best possible moves
+            # conditions regarding the amount of time left, the nb of remaining move left and the nb of token current player has
+            if self.total_nb_token_left > 6:
+                if self.timeRemaining < 8:
+                    depth = 2
+                elif self.timeRemaining < 15: # modify value?
+                    depth = 3
+                elif self.timeRemaining < 30:
+                    depth = 3
+                else:
+                    if self.movesRemaining > 248: # play fast for first moves
+                        depth = 2
+                    elif self.movesRemaining > 40:
+                        depth = 3
+                    else:
+                        depth = 4
+            else:
+                if self.timeRemaining < 5:
+                    depth = 3
+                elif self.timeRemaining < 15: # modify value?
+                    depth = 3
+                elif self.timeRemaining > 20:
+                    depth = 4
+
+            # evaluate if we take a smaller depth for search tree
+            depth = self.checkDistance_me_to_opponent(depth, self.my_tokens, self.opponent_tokens)
+
+            # get all possible move
+            moves = self.getAllPossibleMoves(self.board, self.colour) 
                 
             best = None
             bestMove = None
             alpha = None
             beta = None
             for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
+                # print(move)
                 newBoard = copy.deepcopy(self.board)
                 # perform move
                 self.doMove(newBoard,move)
-                # check state of board
+                # check if state of board is repeated
                 is_repeated_state = self.checkRepeatedBoardState(newBoard)
                 if is_repeated_state == False:
                     #Beta is always None here as there is no parent MIN node. So no need to check if we can prune or not.
                     moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
+                    # print("moveVal: ",moveVal)
                     if moveVal != None:
                         if best == None or moveVal > best:
                             bestMove = move
@@ -122,6 +136,21 @@ class ExamplePlayer:
 
         return bestMove
 
+    # evaluate if we take a smaller depth for search tree
+    def checkDistance_me_to_opponent(self, depth, my_tokens, opponent_tokens):
+        # compute euclidean
+        for i in range(len(my_tokens)):
+            for j in range(len(opponent_tokens)):
+                eucl_dist = math.sqrt((my_tokens[i][0][0]-opponent_tokens[j][0][0])**2+(my_tokens[i][0][1]-opponent_tokens[j][0][1])**2)
+                # if at least an opponent token is under 3 squares distance -> continue with given depth   
+                if eucl_dist <= 3:
+                    return depth
+
+        # if no opponent token is under 3 squares distance -> continue with depth = 2
+        depth = 2
+        return depth
+
+    # check if state of board already occured before
     def checkRepeatedBoardState(self, board):
         # convert to list and sort
         dic_to_list = [(k, v) for k, v in board.items()]
@@ -182,14 +211,20 @@ class ExamplePlayer:
                 print("Action ERROR")
 
         # save up to 10 last states of the board and add to save state list
-        # if len(self.save_last_board_states) == 10:
-        #     self.save_last_board_states.pop(0)
-        dic_to_list = [(k, v) for k, v in self.board.items()] 
-        # print(dic_to_list)
-        # dic_to_list.sort(key = lambda x: x[0])
+        dic_to_list = [(k, v) for k, v in self.board.items()]
         self.save_last_board_states.append(copy.deepcopy(dic_to_list))
-        # if len(self.save_last_board_states) == 10:
-        #     print(self.save_last_board_states)
+        
+        # get my tokens and opponent's positions
+        if colour == "white":
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+        else:
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+
+        # update nb token left for each player
+        self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
+        self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self, board, colour):
@@ -252,7 +287,6 @@ class ExamplePlayer:
                                 return True  
         return False
 
-
     # Get a list of all possible moves of <colour>
     def getAllPossibleMoves(self, board, colour):
         moves = []
@@ -270,15 +304,35 @@ class ExamplePlayer:
                 moves = moves + moves_for_position
                 boom_moves = boom_moves + boom_moves_for_position
 
-        # ordering moves
-        if colour == 'white':
-            # boom_moves.sort(key = lambda x: x[1][1], reverse=True)
-            moves.sort(key = lambda x: x[3][1], reverse=True)
-        if colour == 'black':
-            # boom_moves.sort(key = lambda x: x[1][1])
-            moves.sort(key = lambda x: x[3][1])
+        moves = self.sortListMoves(board, colour, copy.deepcopy(moves))
 
         return boom_moves + moves
+
+    def sortListMoves(self, board, colour, moves):
+        # get side of each opponent token
+        dic = {"bottom" : 0, "top" : 0}
+        if colour == "white":
+            for key, value in board.items():
+                if value < 0 and key[1] >= 4:
+                    dic["top"] += 1
+                elif value < 0 and key[1] < 4:
+                    dic["bottom"] += 1
+        else:
+            for key, value in board.items():
+                if value > 0 and key[1] >= 4:
+                    dic["top"] += 1
+                elif value > 0 and key[1] < 4:
+                    dic["bottom"] += 1
+
+        # get side that has the more opponent tokens
+        max_side = max(dic, key=lambda key: dic[key])
+        # sort moves depending on where the most opponent's tokens are
+        if max_side == "bottom":
+            moves = sorted(moves, key = lambda x: x[3][1])
+        else:
+            moves = sorted(moves, key = lambda x: x[3][1], reverse = True)
+
+        return moves
 
     # Returns a tuple : list of all possible moves at the current position and if the moves are Boom moves
     def getAllPossibleMovesAtPosition(self, board, colour, x, y, nb_token):
@@ -362,14 +416,14 @@ class ExamplePlayer:
 
     # Alpha Beta pruning algorithm
     def alphaBeta_pruning(self, board, colour, depth, turn, opponentColour, alpha, beta):
-        if depth > 1: #Comes here depth-1 times and goes to else for leaf nodes.
+        if depth > 1 and self.isAnyMovePossible(board, colour) == True: #Comes here depth-1 times and goes to else for leaf nodes.
             depth -= 1
             opti = None
+            # MAX turn
             if turn == 'max' and self.isAnyMovePossible(board, colour) == True:
                 moves = self.getAllPossibleMoves(board, colour) #Gets all possible moves for player
-                # print(moves)
+                # for each move, do algo
                 for move in moves:
-                    # print("current move alpha and depth", depth, move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
                     if opti == None or beta == None or beta > opti: #None conditions are to check for the first times
@@ -380,10 +434,11 @@ class ExamplePlayer:
                             if alpha == None or opti > alpha:
                                 alpha = opti
 
+            # MIN turn
             elif turn == 'min' and self.isAnyMovePossible(board, colour) == True:
                 moves = self.getAllPossibleMoves(board, opponentColour) #Gets all possible moves for the opponent
+                # for each move, do algo
                 for move in moves:
-                    # print("current move beta and depth", depth, move)
                     nextBoard = copy.deepcopy(board)
                     self.doMove(nextBoard,move)
                     if alpha == None or opti == None or alpha < opti: #None conditions are to check for the first times
@@ -393,9 +448,7 @@ class ExamplePlayer:
                                 opti = value
                             if beta == None or opti < beta:
                                 beta = opti
-
             # input("Press the <ENTER> key to continue...")
-
             return opti # opti will contain the best value for player in MAX turn and worst value for player in MIN turn
 
         else: #Comes here for the last level i.e leaf nodes
@@ -407,6 +460,13 @@ class ExamplePlayer:
                 #An opponent stack of more than 1 token is 1.1 times worse for the player than a stack of 1 token.
                 #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
                 #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
+                if colour == "white":
+                    nb_my_token = sum(value for value in board.values() if value > 0)
+                    nb_opponent_token = sum(value for value in board.values() if value < 0)
+                else:
+                    nb_my_token = sum(value for value in board.values() if value < 0)
+                    nb_opponent_token = sum(value for value in board.values() if value > 0)
+
                 # second attempt
                 if (colour == "white" and board[position] == 1) or (colour == "black" and board[position] == -1): # if my colour and position has 1 token
                     value += 1
@@ -417,13 +477,13 @@ class ExamplePlayer:
                 elif (colour == "white" and board[position] < -1) or (colour == "black" and board[position] > 1): # if opponent colour and position has stack of tokens
                     value -= (abs(board[position]) *1.1)
 
-                # first attempt
-                # if (colour == "white" and board[position] > 0) or (colour == "black" and board[position] < 0): # if my colour and position has 1 token
-                #     value += board[position]
-                # elif (colour == "white" and board[position] < 0) or (colour == "black" and board[position] > 0): # if opponent colour and position has 1 token
-                #     value += board[position]
+            # draw move
+            if nb_my_token == 0 and nb_opponent_token == 0:
+                value += 10
+            # win move
+            if nb_opponent_token == 0:
+                value += 40
 
-            # print('val: ', value)
             return value
 
     # display board

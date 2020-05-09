@@ -19,16 +19,9 @@ class ExamplePlayer:
         strings "white" or "black" correspondingly.
         """
         # TODO: Set up state representation.
-
         self.colour = colour
-        if self.colour == "white":
-            self.opponentColour = "black"
-        else:
-            self.opponentColour = "white"
 
-        self.movesRemaining = 250
-        self.timeRemaining = 60
-
+        # create and initialise the board
         self.board = {(x, y):0 for x in range(8) for y in range(8)}
 
         white_tokens = [(0,1), (1,1),   (3,1), (4,1),   (6,1), (7,1),
@@ -36,10 +29,31 @@ class ExamplePlayer:
         black_tokens = [(0,7), (1,7),   (3,7), (4,7),   (6,7), (7,7),
                         (0,6), (1,6),   (3,6), (4,6),   (6,6), (7,6)]
 
+        # fill up the board
         for xy in white_tokens:
             self.board[xy] = +1
         for xy in black_tokens:
             self.board[xy] = -1
+
+        if self.colour == "white":
+            self.opponentColour = "black"
+            # get my tokens and opponent's positions
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+        else:
+            self.opponentColour = "white"
+            # get my tokens and opponent's positions
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+
+        self.movesRemaining = 250
+        self.timeRemaining = 60
+
+        # compute nb of token left for each player
+        self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
+        self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
+
+        self.save_last_board_states = []
 
     def action(self):
         """
@@ -104,6 +118,22 @@ class ExamplePlayer:
             else:
                 print("Action ERROR")
 
+        # save up to 10 last states of the board and add to save state list
+        dic_to_list = [(k, v) for k, v in self.board.items()]
+        self.save_last_board_states.append(copy.deepcopy(dic_to_list))
+        
+        # get my tokens and opponent's positions
+        if colour == "white":
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+        else:
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+
+        # update nb token left for each player
+        self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
+        self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
+
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self):
         # Loop through all board positions
@@ -144,37 +174,6 @@ class ExamplePlayer:
 
         return True
 
-    # check distance between the current token and each enemy position
-    def checkDistance(self, board, colour, xa, ya, xb, yb):
-        best_dist = 1000
-        save_best_pos = 1000
-        # compute euclidean distance between :
-        #   - initial position and each enemy token
-        #   - final position and each enemy token
-        for position, nb_token in board.items():
-            # if white player
-            if colour == "white" and nb_token < 0:
-                dist_initial_state = math.sqrt( (xa-position[0])**2 + (ya-position[1])**2 )
-                dist_final_state = math.sqrt( (xb-position[0])**2 + (yb-position[1])**2 )
-                if dist_initial_state < save_best_pos:
-                    save_best_pos = dist_initial_state
-                if dist_initial_state < best_dist and dist_final_state < dist_initial_state and dist_final_state < save_best_pos:
-                    best_dist = dist_initial_state
-            # if black player
-            elif colour == "black" and nb_token > 0:
-                dist_initial_state = math.sqrt( (xa-position[0])**2 + (ya-position[1])**2 )
-                dist_final_state = math.sqrt( (xb-position[0])**2 + (yb-position[1])**2 )
-                if dist_initial_state < save_best_pos:
-                    save_best_pos = dist_initial_state
-                if dist_initial_state < best_dist and dist_final_state < dist_initial_state and dist_final_state < save_best_pos:
-                    best_dist = dist_initial_state
-        
-        if best_dist == 1000:
-            return False
-
-        return True
-
-
     # Returns whether any of the <colour> pieces can make a Boom
     def isBoomPossible(self):
         # Loop through all board positions
@@ -197,24 +196,51 @@ class ExamplePlayer:
         return False
 
 
-    # Get a list of all possible moves of <colour>
+     # Get a list of all possible moves of <colour>
     def getAllPossibleMoves(self, board, colour):
         moves = []
-        
-        isBoomPossible = self.isBoomPossible()
+        boom_moves = []
 
+        isBoomPossible = self.isBoomPossible(board, colour)
+        nb_boom_move = 0
         # Loop through all board positions
         for position, nb_token in board.items():
             x, y = position
 
             # check if that position has one of our token
             if (nb_token > 0 and colour == "white") or (nb_token < 0 and colour == "black"):
-                moves_for_position, isBoom = self.getAllPossibleMovesAtPosition(board, colour, x, y, nb_token)
-                
-                # if isBoomPossible == isBoom:
-                for move in moves_for_position:
-                    moves.append(move)
-        
+                boom_moves_for_position, moves_for_position, isBoom = self.getAllPossibleMovesAtPosition(board, colour, x, y, nb_token)
+                moves = moves + moves_for_position
+                boom_moves = boom_moves + boom_moves_for_position
+
+        moves = self.sortListMoves(board, colour, copy.deepcopy(moves))
+
+        return boom_moves + moves
+
+    def sortListMoves(self, board, colour, moves):
+        # get side of each opponent token
+        dic = {"bottom" : 0, "top" : 0}
+        if colour == "white":
+            for key, value in board.items():
+                if value < 0 and key[1] >= 4:
+                    dic["top"] += 1
+                elif value < 0 and key[1] < 4:
+                    dic["bottom"] += 1
+        else:
+            for key, value in board.items():
+                if value > 0 and key[1] >= 4:
+                    dic["top"] += 1
+                elif value > 0 and key[1] < 4:
+                    dic["bottom"] += 1
+
+        # get side that has the more opponent tokens
+        max_side = max(dic, key=lambda key: dic[key])
+        # sort moves depending on where the most opponent's tokens are
+        if max_side == "bottom":
+            moves = sorted(moves, key = lambda x: x[3][1])
+        else:
+            moves = sorted(moves, key = lambda x: x[3][1], reverse = True)
+
         return moves
 
     # Returns a tuple : list of all possible moves at the current position and if the moves are Boom moves
@@ -225,32 +251,29 @@ class ExamplePlayer:
 
         boom_moves = self.getAllBoomMovesAtPosition(board, colour, x, y, nb_token)
 
-        for m in boom_moves:
-            moves.append(m)
-
         n = abs(nb_token)
-        for i in range(1,n+1):
-            # Can move left
-            if self.canMoveToPosition(x, y, x-i, y) == True:
-                if self.checkDistance(board, colour, x, y, x-i, y) == True: 
-                    moves.append(("MOVE", i, (x, y), (x-i, y)))
-            # Can move right
-            if self.canMoveToPosition(x, y, x+i, y) == True:  
-                if self.checkDistance(board, colour, x, y, x+i, y) == True:   
-                    moves.append(("MOVE", i, (x, y), (x+i, y)))
-            # Can move down
-            if self.canMoveToPosition(x, y, x, y-i) == True:                                
-                if self.checkDistance(board, colour, x, y, x, y-i) == True:  
-                    moves.append(("MOVE", i, (x, y), (x, y-i)))
-            # Can move up    
-            if self.canMoveToPosition(x, y, x, y+i) == True:                                
-                if self.checkDistance(board, colour, x, y, x, y+i) == True:  
-                    moves.append(("MOVE", i, (x, y), (x, y+i)))
+        for i in range(1,n+1): # move to x/y +- i square
+            for j in range(1,n+1): # move j nb token
+                # Can move left
+                if self.canMoveToPosition(board, colour, x, y, x-i, y) == True:
+                    moves.append(("MOVE", j, (x, y), (x-i, y)))
+                # Can move right
+                if self.canMoveToPosition(board, colour, x, y, x+i, y) == True:  
+                    moves.append(("MOVE", j, (x, y), (x+i, y)))
+                # Can move down
+                if self.canMoveToPosition(board, colour, x, y, x, y-i) == True:                                
+                    moves.append(("MOVE", j, (x, y), (x, y-i)))
+                # Can move up    
+                if self.canMoveToPosition(board, colour, x, y, x, y+i) == True:                                
+                    moves.append(("MOVE", j, (x, y), (x, y+i)))
+        
+        if len(boom_moves) == 0:
+            isBoom == True
 
-        return moves, isBoom
+        return boom_moves, moves, isBoom
 
+    # get all possible boom moves for a given position
     def getAllBoomMovesAtPosition(self, board, colour, x, y, nb_token):
-        # BOOM action
         boom_moves = []
         if nb_token > 0 and colour == "white":
             for i in range(-1,2):
@@ -264,7 +287,6 @@ class ExamplePlayer:
                     if x+i >= 0 and y+j >= 0 and x+i <= 7 and y+j <= 7: # if (i,j) is inside the board
                         if board[(x+i,y+j)] > 0: # if there is an enemy token
                             boom_moves.append(("BOOM", (x, y)))
-
         return boom_moves
 
 

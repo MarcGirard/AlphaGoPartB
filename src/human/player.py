@@ -19,16 +19,9 @@ class ExamplePlayer:
         strings "white" or "black" correspondingly.
         """
         # TODO: Set up state representation.
-
         self.colour = colour
-        if self.colour == "white":
-            self.opponentColour = "black"
-        else:
-            self.opponentColour = "white"
 
-        self.movesRemaining = 250
-        self.timeRemaining = 60
-
+        # create and initialise the board
         self.board = {(x, y):0 for x in range(8) for y in range(8)}
 
         white_tokens = [(0,1), (1,1),   (3,1), (4,1),   (6,1), (7,1),
@@ -36,10 +29,31 @@ class ExamplePlayer:
         black_tokens = [(0,7), (1,7),   (3,7), (4,7),   (6,7), (7,7),
                         (0,6), (1,6),   (3,6), (4,6),   (6,6), (7,6)]
 
+        # fill up the board
         for xy in white_tokens:
             self.board[xy] = +1
         for xy in black_tokens:
             self.board[xy] = -1
+
+        if self.colour == "white":
+            self.opponentColour = "black"
+            # get my tokens and opponent's positions
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+        else:
+            self.opponentColour = "white"
+            # get my tokens and opponent's positions
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+
+        self.movesRemaining = 250
+        self.timeRemaining = 60
+
+        # compute nb of token left for each player
+        self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
+        self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
+
+        self.save_last_board_states = []
 
     def action(self):
         """
@@ -111,6 +125,22 @@ class ExamplePlayer:
                 self.board[end_position] -= nb_token_moved
             else:
                 print("Action ERROR")
+
+        # save up to 10 last states of the board and add to save state list
+        dic_to_list = [(k, v) for k, v in self.board.items()]
+        self.save_last_board_states.append(copy.deepcopy(dic_to_list))
+        
+        # get my tokens and opponent's positions
+        if colour == "white":
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+        else:
+            self.my_tokens = [[key, value] for key, value in self.board.items() if value < 0]
+            self.opponent_tokens = [[key, value] for key, value in self.board.items() if value > 0]
+
+        # update nb token left for each player
+        self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
+        self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
 
     # Returns whether any of the <colour> pieces can make a valid move at this time
     def isAnyMovePossible(self, board, colour):
@@ -191,15 +221,35 @@ class ExamplePlayer:
                 moves = moves + moves_for_position
                 boom_moves = boom_moves + boom_moves_for_position
 
-        # ordering moves
-        if colour == 'white':
-            # boom_moves.sort(key = lambda x: x[1][1], reverse=True)
-            moves.sort(key = lambda x: x[3][1], reverse=True)
-        if colour == 'black':
-            # boom_moves.sort(key = lambda x: x[1][1])
-            moves.sort(key = lambda x: x[3][1])
+        moves = self.sortListMoves(board, colour, copy.deepcopy(moves))
 
         return boom_moves + moves
+
+    def sortListMoves(self, board, colour, moves):
+        # get side of each opponent token
+        dic = {"bottom" : 0, "top" : 0}
+        if colour == "white":
+            for key, value in board.items():
+                if value < 0 and key[1] >= 4:
+                    dic["top"] += 1
+                elif value < 0 and key[1] < 4:
+                    dic["bottom"] += 1
+        else:
+            for key, value in board.items():
+                if value > 0 and key[1] >= 4:
+                    dic["top"] += 1
+                elif value > 0 and key[1] < 4:
+                    dic["bottom"] += 1
+
+        # get side that has the more opponent tokens
+        max_side = max(dic, key=lambda key: dic[key])
+        # sort moves depending on where the most opponent's tokens are
+        if max_side == "bottom":
+            moves = sorted(moves, key = lambda x: x[3][1])
+        else:
+            moves = sorted(moves, key = lambda x: x[3][1], reverse = True)
+
+        return moves
 
     # Returns a tuple : list of all possible moves at the current position and if the moves are Boom moves
     def getAllPossibleMovesAtPosition(self, board, colour, x, y, nb_token):
@@ -245,7 +295,6 @@ class ExamplePlayer:
                     if x+i >= 0 and y+j >= 0 and x+i <= 7 and y+j <= 7: # if (i,j) is inside the board
                         if board[(x+i,y+j)] > 0: # if there is an enemy token
                             boom_moves.append(("BOOM", (x, y)))
-        
         return boom_moves
 
     # perform the move and "updates" the board
