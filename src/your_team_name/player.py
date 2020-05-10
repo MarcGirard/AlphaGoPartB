@@ -4,8 +4,6 @@ import copy
 import time
 import math
 import numpy as np
-from scipy.cluster.vq import vq, kmeans, whiten
-import operator
 
 class ExamplePlayer:
     def __init__(self, colour):
@@ -50,6 +48,8 @@ class ExamplePlayer:
         self.movesRemaining = 250
         self.timeRemaining = 60
 
+        self.depth = 3
+
         # compute nb of token left for each player
         self.total_nb_token_left = sum(abs(item[1]) for item in self.my_tokens)
         self.total_nb_token_left_opponent = sum(abs(item[1]) for item in self.opponent_tokens)
@@ -68,56 +68,80 @@ class ExamplePlayer:
         # TODO: Decide what action to take, and return it
 
         startTimer = time.time()
-        depth = 3
         bestMove = None
 
         # if a move is possible -> play
         if self.isAnyMovePossible(self.board, self.colour) == True:
             #Changing the number of ply for minimax tree to budget time and get best possible moves
             # conditions regarding the amount of time left, the nb of remaining move left and the nb of token current player has
-            if self.total_nb_token_left > 6:
-                if self.timeRemaining < 8:
-                    depth = 2
-                elif self.timeRemaining < 15: # modify value?
-                    depth = 3
-                elif self.timeRemaining < 30:
-                    depth = 3
-                else:
-                    if self.movesRemaining > 248: # play fast for first moves
-                        depth = 2
-                    elif self.movesRemaining > 40:
-                        depth = 3
-                    else:
-                        depth = 4
+            if self.timeRemaining < 8:
+                self.depth = 1
+            elif self.timeRemaining < 15:
+                self.depth = 2
+            elif self.timeRemaining < 30:
+                self.depth = 3
             else:
-                if self.timeRemaining < 5:
-                    depth = 3
-                elif self.timeRemaining < 15: # modify value?
-                    depth = 3
-                elif self.timeRemaining > 20:
-                    depth = 4
-
-            # evaluate if we take a smaller depth for search tree
-            depth = self.checkDistance_me_to_opponent(depth, self.my_tokens, self.opponent_tokens)
+                if self.movesRemaining > 40:
+                    self.depth = 3
+                else:
+                    self.depth = 4
 
             # get all possible move
             moves = self.getAllPossibleMoves(self.board, self.colour) 
-                
+
+            # if opponent player has one token left -> finish game quickly
+            if self.total_nb_token_left >= 1 and self.total_nb_token_left_opponent == 1:
+                pos_last_opp_token = self.opponent_tokens[0][0]
+                best_next_pos = None
+                # for each move, compute euclidean dist and return the move that will get our token closer to the opponents' one
+                for move in moves:
+                    if move[0] == "MOVE":
+                        # eucl_dist_current_pos = math.sqrt((move[2][0]-pos_last_opp_token[0])**2+(move[2][1]-pos_last_opp_token[1])**2)
+                        eucl_dist_next_pos = math.sqrt((move[3][0]-pos_last_opp_token[0])**2+(move[3][1]-pos_last_opp_token[1])**2)
+                        if best_next_pos == None or (eucl_dist_next_pos <= best_next_pos[0] and move[1] <= best_next_pos[1]):
+                           bestMove = move
+                           best_next_pos = (eucl_dist_next_pos,move[1])
+                    else:
+                        return move
+                return bestMove
+
             best = None
             bestMove = None
             alpha = None
             beta = None
-            for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn
-                # print(move)
+            for move in moves: # this is the max turn(1st level of minimax), so next should be min's turn                
+                # evaluate if we take a smaller depth for search tree for current move
+                if self.depth > 1:
+                    depth = self.checkDistance_token_to_opponents(self.depth, move, self.my_tokens, self.opponent_tokens)
+                else:
+                    depth = self.depth
+                # if the algorithm takes too much time, reduce depth to go
+                intermidiateTimer = time.time()
+                if intermidiateTimer - startTimer > 5 and depth > 2:
+                    depth -= 1
+
                 newBoard = copy.deepcopy(self.board)
                 # perform move
                 self.doMove(newBoard,move)
+                
+                # finish the game if possible (if no enemy token left after this move)
+                finish_game = True
+                if self.colour == "white":
+                    for value in newBoard.values():
+                        if value < 0:
+                            finish_game = False
+                else:
+                    for value in newBoard.values():
+                        if value > 0:
+                            finish_game = False
+                if finish_game == True:
+                    return move
+
                 # check if state of board is repeated
                 is_repeated_state = self.checkRepeatedBoardState(newBoard)
                 if is_repeated_state == False:
                     #Beta is always None here as there is no parent MIN node. So no need to check if we can prune or not.
                     moveVal = self.alphaBeta_pruning(newBoard, self.colour, depth, 'min', self.opponentColour, alpha, beta)
-                    # print("moveVal: ",moveVal)
                     if moveVal != None:
                         if best == None or moveVal > best:
                             bestMove = move
@@ -126,7 +150,6 @@ class ExamplePlayer:
                             alpha = best
                     if bestMove == None: # not possible normally
                         bestMove = moves[0]                   
-
         else:
             print("No Possible move!")
 
@@ -136,18 +159,27 @@ class ExamplePlayer:
 
         return bestMove
 
-    # evaluate if we take a smaller depth for search tree
-    def checkDistance_me_to_opponent(self, depth, my_tokens, opponent_tokens):
-        # compute euclidean
-        for i in range(len(my_tokens)):
-            for j in range(len(opponent_tokens)):
-                eucl_dist = math.sqrt((my_tokens[i][0][0]-opponent_tokens[j][0][0])**2+(my_tokens[i][0][1]-opponent_tokens[j][0][1])**2)
-                # if at least an opponent token is under 3 squares distance -> continue with given depth   
-                if eucl_dist <= 3:
-                    return depth
 
-        # if no opponent token is under 3 squares distance -> continue with depth = 2
-        depth = 2
+    # evaluate if we take a smaller depth for search tree for current move
+    def checkDistance_token_to_opponents(self, depth, move, my_tokens, opponent_tokens):
+        
+        if move[0] == "MOVE":
+            x, y = move[2]
+            nb_token_initially_at_move = [item[1] for item in my_tokens if item[0] == move[2]]
+
+            if nb_token_initially_at_move[0] < 3: # if position has a stack of less than 3 tokens
+                # compute euclidean with all opponent tokens
+                for j in range(len(opponent_tokens)):
+                    eucl_dist = math.sqrt((x-opponent_tokens[j][0][0])**2+(y-opponent_tokens[j][0][1])**2)
+                    # if at least an opponent token is under 4 squares distance -> continue with given depth   
+                    if eucl_dist <= 3.6:
+                        return depth
+            else: # if position has more than 3 tokens
+                return depth
+
+            # if no opponent token is under 3.6 squares distance -> continue with depth = 2
+            depth = 2
+
         return depth
 
     # check if state of board already occured before
@@ -215,7 +247,7 @@ class ExamplePlayer:
         self.save_last_board_states.append(copy.deepcopy(dic_to_list))
         
         # get my tokens and opponent's positions
-        if colour == "white":
+        if self.colour == "white":
             self.my_tokens = [[key, value] for key, value in self.board.items() if value > 0]
             self.opponent_tokens = [[key, value] for key, value in self.board.items() if value < 0]
         else:
@@ -302,7 +334,9 @@ class ExamplePlayer:
             if (nb_token > 0 and colour == "white") or (nb_token < 0 and colour == "black"):
                 boom_moves_for_position, moves_for_position, isBoom = self.getAllPossibleMovesAtPosition(board, colour, x, y, nb_token)
                 moves = moves + moves_for_position
-                boom_moves = boom_moves + boom_moves_for_position
+                for boom in boom_moves_for_position:
+                    if boom not in boom_moves:
+                        boom_moves.append(boom)
 
         moves = self.sortListMoves(board, colour, copy.deepcopy(moves))
 

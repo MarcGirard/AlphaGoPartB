@@ -224,7 +224,6 @@ class ExamplePlayer:
                                 return True  
         return False
 
-
     # Get a list of all possible moves of <colour>
     def getAllPossibleMoves(self, board, colour):
         moves = []
@@ -240,7 +239,9 @@ class ExamplePlayer:
             if (nb_token > 0 and colour == "white") or (nb_token < 0 and colour == "black"):
                 boom_moves_for_position, moves_for_position, isBoom = self.getAllPossibleMovesAtPosition(board, colour, x, y, nb_token)
                 moves = moves + moves_for_position
-                boom_moves = boom_moves + boom_moves_for_position
+                for boom in boom_moves_for_position:
+                    if boom not in boom_moves:
+                        boom_moves.append(boom)
 
         moves = self.sortListMoves(board, colour, copy.deepcopy(moves))
 

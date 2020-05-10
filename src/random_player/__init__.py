@@ -5,6 +5,6 @@
 # example import below, you can define it in another file and import
 # it into this module with the name 'Player':
 
-from random.player import ExamplePlayer as Player
+from random_player.player import ExamplePlayer as Player
 
 
