@@ -1,4 +1,10 @@
+"""
+Jawad Mohammed: 1032222
+Marc Girard: 1155873
 
+inspired by the checkers game:
+https://github.com/vikaspro90/Checkers-game/blob/master/gamePlay.py
+"""
 from collections import Counter
 import copy
 import time
@@ -91,19 +97,10 @@ class ExamplePlayer:
 
             # if opponent player has one token left -> finish game quickly
             if self.total_nb_token_left >= 1 and self.total_nb_token_left_opponent == 1:
-                pos_last_opp_token = self.opponent_tokens[0][0]
-                best_next_pos = None
-                # for each move, compute euclidean dist and return the move that will get our token closer to the opponents' one
-                for move in moves:
-                    if move[0] == "MOVE":
-                        # eucl_dist_current_pos = math.sqrt((move[2][0]-pos_last_opp_token[0])**2+(move[2][1]-pos_last_opp_token[1])**2)
-                        eucl_dist_next_pos = math.sqrt((move[3][0]-pos_last_opp_token[0])**2+(move[3][1]-pos_last_opp_token[1])**2)
-                        if best_next_pos == None or (eucl_dist_next_pos <= best_next_pos[0] and move[1] <= best_next_pos[1]):
-                           bestMove = move
-                           best_next_pos = (eucl_dist_next_pos,move[1])
-                    else:
-                        return move
-                return bestMove
+                # return move that will get us the closest as possible to opponent token
+                bestMove = self.quickestMove(moves, self.opponent_tokens)
+                if bestMove != None:
+                    return bestMove
 
             best = None
             bestMove = None
@@ -125,15 +122,7 @@ class ExamplePlayer:
                 self.doMove(newBoard,move)
                 
                 # finish the game if possible (if no enemy token left after this move)
-                finish_game = True
-                if self.colour == "white":
-                    for value in newBoard.values():
-                        if value < 0:
-                            finish_game = False
-                else:
-                    for value in newBoard.values():
-                        if value > 0:
-                            finish_game = False
+                finish_game = self.finishTheGame(newBoard,self.colour)
                 if finish_game == True:
                     return move
 
@@ -151,14 +140,13 @@ class ExamplePlayer:
                     if bestMove == None: # not possible normally
                         bestMove = moves[0]                   
         else:
-            print("No Possible move!")
+            print("\n\nERROR: No Possible move!\n\n")
 
         stopTimer =  time.time()
         self.timeRemaining =  self.timeRemaining - (stopTimer - startTimer)
         self.movesRemaining = self.movesRemaining - 1
 
         return bestMove
-
 
     # evaluate if we take a smaller depth for search tree for current move
     def checkDistance_token_to_opponents(self, depth, move, my_tokens, opponent_tokens):
@@ -202,6 +190,37 @@ class ExamplePlayer:
         if count > 1:
             return True
         return False
+
+    # evaluate if the board given states that the game ends. is called after self.doMove function
+    def finishTheGame(self, board, colour):
+        finish_game = True
+        if colour == "white":
+            for value in board.values():
+                if value < 0:
+                    finish_game = False
+        else:
+            for value in board.values():
+                if value > 0:
+                    finish_game = False
+        return finish_game
+
+    # return move that will get us the closest as possible to opponent token
+    def quickestMove(self, moves, opponent_tokens):
+        bestMove = None
+        pos_last_opp_token = opponent_tokens[0][0]
+        best_next_pos = None
+        # for each move, compute euclidean dist and return the move that will get our token closer to the opponents' one
+        for move in moves:
+            if move[0] == "MOVE":
+                # eucl_dist_current_pos = math.sqrt((move[2][0]-pos_last_opp_token[0])**2+(move[2][1]-pos_last_opp_token[1])**2)
+                eucl_dist_next_pos = math.sqrt((move[3][0]-pos_last_opp_token[0])**2+(move[3][1]-pos_last_opp_token[1])**2)
+                if best_next_pos == None or (eucl_dist_next_pos <= best_next_pos[0] and move[1] <= best_next_pos[1]):
+                   bestMove = move
+                   best_next_pos = (eucl_dist_next_pos,move[1])
+            else:
+                return move
+        return bestMove
+
 
     def update(self, colour, action):
         """
@@ -489,19 +508,13 @@ class ExamplePlayer:
             value = 0
             for position, nb_token in board.items():
                 x, y = position
-                #Below, we count the number of token in a stack for each colour.
-                #A player stack of more than 1 token is 1.1 times more valuable than a stack of 1 token.
-                #An opponent stack of more than 1 token is 1.1 times worse for the player than a stack of 1 token.
-                #By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
-                #It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
-                if colour == "white":
-                    nb_my_token = sum(value for value in board.values() if value > 0)
-                    nb_opponent_token = sum(value for value in board.values() if value < 0)
-                else:
-                    nb_my_token = sum(value for value in board.values() if value < 0)
-                    nb_opponent_token = sum(value for value in board.values() if value > 0)
-
-                # second attempt
+                # Below, we count the number of token in a stack for each colour.
+                # A player stack of more than 1 token is 1.1 times more valuable than a stack of 1 token.
+                # An opponent stack of more than 1 token is 1.1 times worse for the player than a stack of 1 token.
+                # By assigning more weight on stacks with several tokens, the AI will prefer killing opponent stacks of several token to killing a stack of 1 token.
+                # It will also prefer saving player stacks of several tokens to saving player stack of 1 token when the situation demands.
+                
+                # evaluation of state of board
                 if (colour == "white" and board[position] == 1) or (colour == "black" and board[position] == -1): # if my colour and position has 1 token
                     value += 1
                 elif (colour == "white" and board[position] == -1) or (colour == "black" and board[position] == 1): # if opponent colour and position has 1 token
@@ -510,6 +523,14 @@ class ExamplePlayer:
                     value += (abs(board[position]) *1.1)
                 elif (colour == "white" and board[position] < -1) or (colour == "black" and board[position] > 1): # if opponent colour and position has stack of tokens
                     value -= (abs(board[position]) *1.1)
+
+            # calculate number of white and black tokens 
+            if colour == "white":
+                nb_my_token = sum(value for value in board.values() if value > 0)
+                nb_opponent_token = sum(value for value in board.values() if value < 0)
+            else:
+                nb_my_token = sum(value for value in board.values() if value < 0)
+                nb_opponent_token = sum(value for value in board.values() if value > 0)
 
             # draw move
             if nb_my_token == 0 and nb_opponent_token == 0:

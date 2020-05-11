@@ -1,3 +1,8 @@
+"""
+Jawad Mohammed: 1032222
+Marc Girard: 1155873
+"""
+
 # Note:
 # The class defined within this module with the name 'Player' is the
 # class we will test when assessing your project.
@@ -5,6 +10,6 @@
 # example import below, you can define it in another file and import
 # it into this module with the name 'Player':
 
-from your_team_name.player import ExamplePlayer as Player
+from AlphaGo.player import ExamplePlayer as Player
 
 
