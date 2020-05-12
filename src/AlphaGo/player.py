@@ -80,9 +80,9 @@ class ExamplePlayer:
         if self.isAnyMovePossible(self.board, self.colour) == True:
             #Changing the number of ply for minimax tree to budget time and get best possible moves
             # conditions regarding the amount of time left, the nb of remaining move left and the nb of token current player has
-            if self.timeRemaining < 8:
+            if self.timeRemaining < 5:
                 self.depth = 1
-            elif self.timeRemaining < 15:
+            elif self.timeRemaining < 10:
                 self.depth = 2
             elif self.timeRemaining < 30:
                 self.depth = 3
@@ -96,9 +96,15 @@ class ExamplePlayer:
             moves = self.getAllPossibleMoves(self.board, self.colour) 
 
             # if opponent player has one token left -> finish game quickly
-            if self.total_nb_token_left >= 1 and self.total_nb_token_left_opponent == 1:
+            if self.total_nb_token_left_opponent == 1:
                 # return move that will get us the closest as possible to opponent token
                 bestMove = self.quickestMove(moves, self.opponent_tokens)
+                if bestMove != None:
+                    return bestMove
+
+            # if there is less than 5 seconds left, go to quickest move
+            if self.timeRemaining < 5:
+                bestMove = self.goToQuickest(moves, self.board, self.colour)
                 if bestMove != None:
                     return bestMove
 
@@ -150,7 +156,6 @@ class ExamplePlayer:
 
     # evaluate if we take a smaller depth for search tree for current move
     def checkDistance_token_to_opponents(self, depth, move, my_tokens, opponent_tokens):
-        
         if move[0] == "MOVE":
             x, y = move[2]
             nb_token_initially_at_move = [item[1] for item in my_tokens if item[0] == move[2]]
@@ -221,6 +226,32 @@ class ExamplePlayer:
                 return move
         return bestMove
 
+    # return move that will get us the closest as possible to one of the opponent tokens
+    def goToQuickest(self, moves, board, colour):
+        bestMove = None
+        best_next_pos = None
+        # for each move, compute euclidean dist and return the move that will get our token closer to the opponents' one
+        for position, nb_token in board.items():
+            for move in moves:
+                if move[0] == "MOVE":
+                    # compute eucl dist
+                    if colour == "white" and nb_token < 0:
+                        # eucl_dist_current_pos = math.sqrt((move[2][0]-position[0])**2+(move[2][1]-position[1])**2)
+                        eucl_dist_next_pos = math.sqrt((move[3][0]-position[0])**2+(move[3][1]-position[1])**2)
+                        if best_next_pos == None or (eucl_dist_next_pos <= best_next_pos[0] and move[1] <= best_next_pos[1]):
+                           bestMove = move
+                           best_next_pos = (eucl_dist_next_pos,move[1])
+                    elif colour == "black" and nb_token > 0:
+                        # compute eucl dist
+                        # eucl_dist_current_pos = math.sqrt((move[2][0]-position[0])**2+(move[2][1]-position[1])**2)
+                        eucl_dist_next_pos = math.sqrt((move[3][0]-position[0])**2+(move[3][1]-position[1])**2)
+                        if best_next_pos == None or (eucl_dist_next_pos <= best_next_pos[0] and move[1] <= best_next_pos[1]):
+                           bestMove = move
+                           best_next_pos = (eucl_dist_next_pos,move[1])
+                else:
+                    return move
+
+        return bestMove
 
     def update(self, colour, action):
         """
